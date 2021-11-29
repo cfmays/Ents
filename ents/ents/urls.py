@@ -17,11 +17,14 @@ from django.contrib import admin
 from django.urls import path
 from . import views
 from django.contrib.auth import views as auth_views
+from django.conf.urls.static import static
+from . import settings
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('',views.index, name='index'),
-    path('create/', views.EnrichmentUploadView.as_view(), name='createView'),
+    path('create/', views.EnrichmentUploadView, name='createView'),
     path('logout/', views.logout_view, name='logout'),
     path('login/', auth_views.LoginView.as_view(), name='login'),
-]
+    
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
