@@ -15,15 +15,16 @@
   <script>
     $("#id_keywords").change(function () {
       url = "{% url 'ajax_load_items' %}"
-      var theKeyWords = $(this).val();  
+      var theKeyWord = $(this).val();  
 
       $.ajax({                       
         url: url,                    
         data: {
-          'theKeyWords': theKeyWords       // add the country id to the GET parameters
+          'theKeyWord': theKeyWord     
         },
-        success: function (data) {   /
-          $("#id_items").html(data);  // replace the contents of the city input with the data that came from the server
+        success: function (data) {   
+            console.log(data)
+          $("#id_items").html(data);  
         }
       });
 
