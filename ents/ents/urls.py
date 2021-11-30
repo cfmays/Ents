@@ -26,5 +26,6 @@ urlpatterns = [
     path('create/', views.EnrichmentUploadView, name='createView'),
     path('logout/', views.logout_view, name='logout'),
     path('login/', auth_views.LoginView.as_view(), name='login'),
+    path('ajax_load_items', views.ajax_load_items, name='ajax_load_items'),
     
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

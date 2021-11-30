@@ -6,11 +6,12 @@ from django.contrib.auth import logout, login
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseRedirect
 from django.urls import reverse
-from .forms import CreateEnrichmentForm
+from .forms import CreateEnrichmentForm, enrichment_items_form
 
 
 def index(request):
-        return render(request, 'index.html')
+    form = enrichment_items_form()
+    return render(request, 'index.html', {'form': form})
 
 
 
@@ -52,4 +53,7 @@ def EnrichmentUploadView(request):
         form = CreateEnrichmentForm()
         return render(request, 'createEnrichment.html', {'form':form})
     
-
+def ajax_load_items(request):
+    theKeyWords=request.get.GET('theKeyWords')
+    theItems = list(Enrichment.objects.values('id','name').filter(keywords__in=theKeyWords))
+    return render(request, 'items_dropdown_list_options.html', {'theItems': theItems})

@@ -1,5 +1,35 @@
 {% extends "base_generic.html" %} 
+
 {% block content %}
-<h1>Enrichment Items</h1>
-<h2>Status</h2>
+
+{% comment %} <p>exportform.html</p> {% endcomment %}
+<form action="{% url 'index' %}" method="post">
+    {% csrf_token %}
+    <h1> Enrichment Items</h1>
+    <p><br>Choose keywords to filter the list of items if desired,<br>then choose an item to see the photo.<br></p>
+    {{ form.as_p }}
+    {% comment %} <input type="submit" value="Submit"> {% endcomment %}
+
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+  <script>
+    $("#id_keywords").change(function () {
+      url = "{% url 'ajax_load_items' %}"
+      var theKeyWords = $(this).val();  
+
+      $.ajax({                       
+        url: url,                    
+        data: {
+          'theKeyWords': theKeyWords       // add the country id to the GET parameters
+        },
+        success: function (data) {   /
+          $("#id_items").html(data);  // replace the contents of the city input with the data that came from the server
+        }
+      });
+
+    });
+  </script>
+</form>
+
 {% endblock %}
+
