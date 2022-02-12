@@ -1,3 +1,5 @@
+from os import name
+from django.http.response import JsonResponse
 from django.shortcuts import render
 from django.views.generic.edit import CreateView
 from .models import Enrichment
@@ -7,6 +9,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseRedirect
 from django.urls import reverse
 from .forms import CreateEnrichmentForm, enrichment_items_form
+from .settings import MEDIA_URL
 
 
 def index(request):
@@ -60,3 +63,11 @@ def ajax_load_items(request):
     theKeyWord=request.GET.get('theKeyWord')
     theItems = list(Enrichment.objects.values('id','name').filter(keywords__in=theKeyWord))
     return render(request, 'items_dropdown_list_options.html', {'theItems': theItems})
+
+def ajax_get_image_url(request):
+    theItemID = request.GET.get('theItem')
+    print('theItemID: ' + theItemID)
+    results = Enrichment.objects.all().filter(id=theItemID)
+    return JsonResponse({'theURL': f"{MEDIA_URL}{results[0].photo.name}"})
+
+

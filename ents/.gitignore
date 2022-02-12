@@ -132,4 +132,4 @@ dmypy.json
 .idea
 
 # don't track the picture uploads folder
-ents/enrich/enrichments/
+enrich/enrichments/

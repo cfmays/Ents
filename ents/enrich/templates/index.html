@@ -8,6 +8,7 @@
     <h1> Enrichment Items</h1>
     <p><br>Choose keywords to filter the list of items if desired,<br>then choose an item to see the photo.<br></p>
     {{ form.as_p }}
+    <img id="image-1" src="" class="img-fluid" alt="Responsive image" >
     {% comment %} <input type="submit" value="Submit"> {% endcomment %}
 
 
@@ -28,6 +29,23 @@
         }
       });
 
+    });
+    $("#id_items").change(function () {
+        url = "{% url 'ajax_get_image_url' %}"
+        var theItem = $(this).val();
+
+        $.ajax({
+            url: url,
+            data: {
+                'theItem': theItem
+            },
+            success: function (data) {
+                var theURL = data['theURL'];
+                console.log('theURL: ' + theURL);
+                $("#image-1").attr("src", theURL);
+            }
+            
+        });
     });
   </script>
 </form>
