@@ -27,7 +27,7 @@ class Migration(migrations.Migration):
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('name', models.CharField(max_length=255, unique=True)),
                 ('photo', models.ImageField(upload_to='enrichments')),
-                ('keywords', models.ManyToManyField(to='enrich.KeyWord')),
+                ('keywords', models.ManyToManyField(to='ents.KeyWord')),
             ],
             options={
                 'ordering': ['name'],
