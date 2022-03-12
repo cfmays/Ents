@@ -39,9 +39,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", get_random_secret_key())
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DEBUG", "False") == "True"
+DEBUG = os.getenv("ENTS_DEBUG", "False") == "True"
+# DEBUG = False
 
-ALLOWED_HOSTS = ['ents.charleymays.org']
+if DEBUG:
+    ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
+else:
+    ALLOWED_HOSTS = ["ents.charleymays.org", "167.172.135.242"]
 
 
 # Application definition
@@ -137,7 +141,11 @@ USE_TZ = False
 
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [
+<<<<<<< HEAD
     os.path.join(BASE_DIR, "staticfiles")
+=======
+    os.path.join(BASE_DIR, "staticfiles") # changed from "static" 3_12_2022
+>>>>>>> 06e2939 (Fixed ENTS-DEBUG)
 ]
 STATIC_ROOT = os.path.join(BASE_DIR, 'static/')
 # Default primary key field type
@@ -148,5 +156,14 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
 
+<<<<<<< HEAD
 MEDIA_ROOT = '/home/charley/ents-media/'
+=======
+if DEBUG:
+    MEDIA_ROOT = '/Users/charlesmays/dev/ents/ents/enrich/'
+else:
+    MEDIA_ROOT = '/home/charley/ents-media/'
+
+MEDIA_ROOT = '/Users/charlesmays/dev/ents/ents/enrich/'
+>>>>>>> 06e2939 (Fixed ENTS-DEBUG)
 MEDIA_URL = '/media/'
