@@ -150,3 +150,5 @@ LOGOUT_REDIRECT_URL = '/'
 MEDIA_ROOT=os.getenv("ENTS_MEDIA_ROOT")
 
 MEDIA_URL = '/media/'
+print("MEDIA_ROOT")
+print(MEDIA_ROOT)
