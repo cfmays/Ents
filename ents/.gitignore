@@ -133,3 +133,6 @@ dmypy.json
 
 # don't track the picture uploads folder
 enrich/enrichments/
+
+#don't track the staticfiles dir. this is crearted by python3 manage.py collectstatic
+staticfiles/
