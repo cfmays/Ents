@@ -7,9 +7,10 @@
     * likely this will be solved by the env package, but also changing the `/home/charley/ents.env` file to say `export` at the beginnign would work?
 
 
-## nginx config
-
-`/etc/nginx/sites-available/ents.charleymays.org`
+## nginx 
+* config `/etc/nginx/sites-available/ents.charleymays.org`
+* logs `/var/log/nginx`
+    * list dir with most recent at the bottom: `ls -lrt` 
 
 ## workflow
 1. work locally
@@ -29,6 +30,11 @@
     1. deploy changes
         1. `source /home/charley/vents/bin/activate`
         1. `source ~/ents.env`
+        1. `export ENT_ALLOWED_HOSTS`
+        1. `export ENT_MEDIA_ROOT`
         1. `python3 manage.py collectstatic`
         1. `python3 manage.py migrate`
         1. `sudo systemctl restart entsgunicorn.service`
+    1. check django service status
+        `1. sudo systemctl status entsgunicorn.service`
+    1. test changes on server
