@@ -2,47 +2,33 @@
 * gunicorn logs: `sudo journalctl -u entsgunicorn.service`
 
 ## Open Questions
-* how to properly serve user u0ploaded media. [This page about static files](https://docs.djangoproject.com/en/4.0/howto/static-files/) doesn't seem to tell me, other than to let me know it's going to be a problem
+
 * how to run (e.g.) `python3 manage.py collectstatic` on the server (tried 1st `source`ing `/home/charley/ents.env` and `/home/charley/vents/bin/activate`)
+    * likely this will be solved by the env package, but also changing the `/home/charley/ents.env` file to say `export` at the beginnign would work?
 
 
 ## nginx config
-```
-server {
-    server_name ents.charleymays.org;
 
-    location = /favicon.ico { access_log off; log_not_found off; }
-    location /static/ {
-        root /home/charley/Ents/ents/staticfiles/;
-    }
+`/etc/nginx/sites-available/ents.charleymays.org`
 
-
-    location = /media/ {
-        root /home/charley/ents-media;
-    }
-
-    location / {
-        include proxy_params;
-        proxy_pass http://unix:/run/entsgunicorn.sock;
-    }
-
-    listen 443 ssl; # managed by Certbot
-    ssl_certificate /etc/letsencrypt/live/ents.charleymays.org/fullchain.pem; # managed by Certbot
-    ssl_certificate_key /etc/letsencrypt/live/ents.charleymays.org/privkey.pem; # managed by Certbot
-    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
-    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
-
-}
-server {
-    if ($host = ents.charleymays.org) {
-        return 301 https://$host$request_uri;
-    } # managed by Certbot
-
-
-    listen 80;
-    server_name ents.charleymays.org;
-    return 404; # managed by Certbot
-
-
-}
-``
+## workflow
+1. work locally
+1. test changes locally
+    1. `python3 manage.py collectstatic`
+    1. `python3 manage.py migrate`
+    1. restart django dev server (kill it then, `python3 manage.py runserver`)
+1. commit your changes and sync to repo
+    1. `git status`
+    1. `git add <whatever files>`
+    1. `git commit -m'<descriptive message>'`
+    1. `git push`
+1. on the (remote) server
+    1. get changes from repo
+        1. `cd /home/charley/Ents/ents`
+        1. `git pull`
+    1. deploy changes
+        1. `source /home/charley/vents/bin/activate`
+        1. `source ~/ents.env`
+        1. `python3 manage.py collectstatic`
+        1. `python3 manage.py migrate`
+        1. `sudo systemctl restart entsgunicorn.service`
