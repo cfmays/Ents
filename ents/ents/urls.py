@@ -29,5 +29,4 @@ urlpatterns = [
     path('ajax_load_items', views.ajax_load_items, name='ajax_load_items'),
     path('ajax_get_image_url', views.ajax_get_image_url, name='ajax_get_image_url'),
     
-    
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

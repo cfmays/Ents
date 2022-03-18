@@ -3,6 +3,8 @@
 
 ## Open Questions
 
+* what image file type should I save in the db? png   check for file size differences
+
 * how to run (e.g.) `python3 manage.py collectstatic` on the server (tried 1st `source`ing `/home/charley/ents.env` and `/home/charley/vents/bin/activate`)
     * likely this will be solved by the env package, but also changing the `/home/charley/ents.env` file to say `export` at the beginnign would work?
 
@@ -14,6 +16,7 @@
 
 ## workflow
 1. work locally
+    1. if new requirements, do PIP freeze and install on the server also
 1. test changes locally
     1. `python3 manage.py collectstatic`
     1. `python3 manage.py migrate`
@@ -36,5 +39,5 @@
         1. `python3 manage.py migrate`
         1. `sudo systemctl restart entsgunicorn.service`
     1. check django service status
-        `1. sudo systemctl status entsgunicorn.service`
+        1. `sudo systemctl status entsgunicorn.service`
     1. test changes on server

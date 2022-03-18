@@ -70,4 +70,6 @@ def ajax_get_image_url(request):
     results = Enrichment.objects.all().filter(id=theItemID)
     return JsonResponse({'theURL': f"{MEDIA_URL}{results[0].photo.name}"})
 
+from django.urls import path
+
 

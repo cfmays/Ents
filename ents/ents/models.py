@@ -1,4 +1,6 @@
+from wsgiref.validate import validator
 from django.db import models
+from django.core.validators import validate_image_file_extension
 import os
 
 class KeyWord(models.Model):
@@ -13,7 +15,8 @@ class KeyWord(models.Model):
 class Enrichment(models.Model):
     name = models.CharField( max_length=255, unique=True)
     keywords = models.ManyToManyField(KeyWord, blank=True)
-    photo = models.ImageField(upload_to='enrichments/', default="")
+    # validate given an image with thanks to https://stackoverflow.com/a/63705082/3023411
+    photo = models.ImageField(upload_to='enrichments/', default="", validators=[validate_image_file_extension])
 
     class Meta:
         ordering = ['name']
