@@ -66,7 +66,7 @@ def ajax_load_items(request):
 
 def ajax_get_image_url(request):
     theItemID = request.GET.get('theItem')
-    print('theItemID: ' + theItemID)
+    # print('theItemID: ' + theItemID)
     results = Enrichment.objects.all().filter(id=theItemID)
     return JsonResponse({'theURL': f"{MEDIA_URL}{results[0].photo.name}"})
 

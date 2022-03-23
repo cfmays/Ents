@@ -33,20 +33,22 @@
       <div class="collapse navbar-collapse" id="navbarSupportedContent">
         <ul class="navbar-nav mr-auto">
           
-          {% url 'createView' as createView_url %}
-          
-          <li class="nav-item{% if request.path == createView_url %} active{% endif %}">
-            <a class="nav-link" href="{% url 'createView' %}">New Item</a>
-          </li>
+         
         </ul>
         <ul class="navbar-nav">
           {% if user.is_staff %}
           <li class="nav-item">
             <a class="nav-link" href="{% url 'admin:index' %}">Admin panel</a>
           </li>
-          {% endif %} {% if user.is_authenticated %}
+          {% endif %} 
+          
+          {% if user.is_authenticated %}
           <li class="nav-item">
             <a class="nav-link" href="{% url 'logout' %}">Log Out</a>
+          </li>
+          {% url 'createView' as createView_url %}
+          <li class="nav-item{% if request.path == createView_url %} active{% endif %}">
+            <a class="nav-link" href="{% url 'createView' %}">New Item</a>
           </li>
           {% else %}
           <li class="nav-item">

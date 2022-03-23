@@ -28,7 +28,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Take environment variables from .env file
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
-print (os.path.join(BASE_DIR, '.env'))
+# print (os.path.join(BASE_DIR, '.env'))
 
 # False if not in os.environ because of casting above
 DEBUG=env('DEBUG')
@@ -133,16 +133,20 @@ AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
     },
+    # {
+    #     'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    # },
+    # {
+    #     'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+    # },
     {
         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+        'OPTIONS': {
+            'min_length': 4,
+        }
     },
 ]
+
 
 
 # Internationalization
@@ -177,3 +181,5 @@ LOGOUT_REDIRECT_URL = '/'
 
 
 MEDIA_URL = '/media/'
+
+MAX_UPLOAD_SIZE = "5242880"
