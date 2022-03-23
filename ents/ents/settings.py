@@ -12,7 +12,39 @@ https://docs.djangoproject.com/en/3.2/ref/settings/
 
 from pathlib import Path
 from django.core.management.utils import get_random_secret_key
+
+import environ
 import os
+
+env = environ.Env(
+    # set casting, default value
+    DEBUG=(bool, False)
+)
+
+
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
+BASE_DIR = Path(__file__).resolve().parent.parent
+#print (BASE_DIR)  /Users/charlesmays/dev/ents/ents
+
+# Take environment variables from .env file
+environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+print (os.path.join(BASE_DIR, '.env'))
+
+# False if not in os.environ because of casting above
+DEBUG=env('DEBUG')
+
+# Raises Django's ImproperlyConfigured
+# exception if SECRET_KEY not in os.environ
+SECRET_KEY=env('SECRET_KEY')
+# SECURITY WARNING: keep the secret key used in production secret!
+# SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", get_random_secret_key())
+# SECRET_KEY=env('SECRET_KEY')
+
+#ALLOWED_HOSTS = os.getenv("ENTS_ALLOWED_HOSTS").split(",")
+ALLOWED_HOSTS=env('ENTS_ALLOWED_HOSTS').split(",")
+
+#MEDIA_ROOT=os.getenv("ENTS_MEDIA_ROOT")
+MEDIA_ROOT=env('ENTS_MEDIA_ROOT')
 
 LOGGING = {
     'version': 1,
@@ -28,21 +60,16 @@ LOGGING = {
     },
 }
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", get_random_secret_key())
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("ENTS_DEBUG", "False") == "True"
+# DEBUG = os.getenv("ENTS_DEBUG", "False") == "True"
 # DEBUG = False
 
-ALLOWED_HOSTS = os.getenv("ENTS_ALLOWED_HOSTS").split(",")
+
 
 # Application definition
 
@@ -147,6 +174,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
-MEDIA_ROOT=os.getenv("ENTS_MEDIA_ROOT")
+
 
 MEDIA_URL = '/media/'
