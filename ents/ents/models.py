@@ -2,6 +2,7 @@ from wsgiref.validate import validator
 from django.db import models
 from django.core.validators import validate_image_file_extension
 import os
+from PIL import Image 
 
 class KeyWord(models.Model):
     name = models.CharField(max_length=64, unique=True)
@@ -26,3 +27,13 @@ class Enrichment(models.Model):
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):                                                                                                                                                                                                                       
+        super().save(*args, **kwargs)                                                                                                                                                                                                                      
+        img=Image.open(self.photo)                                                                                                                                                                                                              
+        if img.height > 960 or img.width >540:                                                                                                                                                                                                             
+            Max_size=(540,960)                                                                                                                                                                                                                             
+            img.thumbnail(Max_size)                                                                                                                                                                                                                        
+            img.save(self.photo.path)                                                                                                                                                                                                                      
+        else:                                                                                                                                                                                                                                              
+            del img

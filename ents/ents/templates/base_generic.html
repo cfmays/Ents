@@ -43,13 +43,14 @@
           {% endif %} 
           
           {% if user.is_authenticated %}
-          <li class="nav-item">
-            <a class="nav-link" href="{% url 'logout' %}">Log Out</a>
-          </li>
           {% url 'createView' as createView_url %}
           <li class="nav-item{% if request.path == createView_url %} active{% endif %}">
             <a class="nav-link" href="{% url 'createView' %}">New Item</a>
           </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'logout' %}">Log Out</a>
+          </li>
+
           {% else %}
           <li class="nav-item">
             <a class="nav-link" href="{% url 'login' %}">Log In</a>
