@@ -10,7 +10,8 @@ class CreateEnrichmentForm(forms.ModelForm):
 
     class Meta:
         model = Enrichment
-        fields = ('name', 'photo', 'keywords')
+        # fields = ('name', 'photo', 'keywords')
+        fields = ('name', 'photo')
         enctype="multipart/form-data"
 
 class enrichment_items_form(Form):
