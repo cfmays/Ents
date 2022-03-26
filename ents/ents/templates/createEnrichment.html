@@ -8,6 +8,22 @@
 <form method="post" enctype="multipart/form-data">{% csrf_token %}
     {{ form.as_p }}
     <input type="submit" value="Save">
+
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+  <script>
+    $("#id_photo").change(function () {
+      
+        
+      var theChosenFileName = $(this).val();  
+      var theItemName = document.getElementById("id_name").value;
+      if (theItemName.length == '') {
+          document.getElementById("id_name").value=theItemName
+      }
+    }
+    )
+  </script>
 </form>
 
 {% endblock %}
+

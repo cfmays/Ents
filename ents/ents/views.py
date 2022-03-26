@@ -43,21 +43,20 @@ def logout_view(request):
     logout(request)
     return HttpResponseRedirect(reverse('index'))
 
-def EnrichmentUploadView(request):
-    if request.method == 'POST':
-        form = CreateEnrichmentForm(request.POST, request.FILES)
-        if form.is_valid():
-            form.save()
-            return HttpResponseRedirect(reverse('index'))
-        else:
-            return render(request, 'createEnrichment.html', {'form':form})
-
-    else:
-        form = CreateEnrichmentForm()
-        return render(request, 'createEnrichment.html', {'form':form})
+    
+def ajax_load_searchstring_items(request):
+    #print (request)
+    #import ipdb; ipdb.set_trace()
+    
+    theSearchString=request.GET.get('theSearchString')
+    #print('theSearchString: ' + theSearchString)
+    theItems = list(Enrichment.objects.values('id','name').filter(name__icontains=theSearchString))
+    #print('theItems: ')
+    #print(theItems)
+    return render(request, 'items_dropdown_list_options.html', {'theItems': theItems})
     
 def ajax_load_items(request):
-    print (request)
+    #print (request)
     #import ipdb; ipdb.set_trace()
     
     theKeyWord=request.GET.get('theKeyWord')

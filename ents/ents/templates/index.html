@@ -14,6 +14,24 @@
 
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
   <script>
+    $("#id_searchString").change(function () {
+      url = "{% url 'ajax_load_searchstring_items' %}"
+      var theSearchString = $(this).val();  
+
+      $.ajax({                       
+        url: url,                    
+        data: {
+          'theSearchString': theSearchString     
+        },
+        success: function (data) {   
+            {% comment %} console.log(data) {% endcomment %}
+          $("#id_items").html(data);  
+        }
+      });
+
+    });
+
+{% comment %} 
     $("#id_keywords").change(function () {
       url = "{% url 'ajax_load_items' %}"
       var theKeyWord = $(this).val();  
@@ -29,7 +47,9 @@
         }
       });
 
-    });
+    }); {% endcomment %}
+
+
     $("#id_items").change(function () {
         url = "{% url 'ajax_get_image_url' %}"
         var theItem = $(this).val();

@@ -14,5 +14,7 @@ class CreateEnrichmentForm(forms.ModelForm):
         enctype="multipart/form-data"
 
 class enrichment_items_form(Form):
-    keywords = forms.ModelChoiceField(label='Select Keywords', queryset=KeyWord.objects.all(), required=False)
+
+    # keywords = forms.ModelChoiceField(label='Select Keywords', queryset=KeyWord.objects.all(), hidden=True, required=False)
+    searchString = forms.CharField(label = 'Enter search text',required=False)
     items = forms.ModelChoiceField(label = 'Select Item',queryset=Enrichment.objects.all(), required=False)

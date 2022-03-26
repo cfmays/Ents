@@ -28,5 +28,6 @@ urlpatterns = [
     path('login/', auth_views.LoginView.as_view(), name='login'),
     path('ajax_load_items', views.ajax_load_items, name='ajax_load_items'),
     path('ajax_get_image_url', views.ajax_get_image_url, name='ajax_get_image_url'),
+    path('ajax_load_searchstring_items', views.ajax_load_searchstring_items, name='ajax_load_searchstring_items'),
     
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
