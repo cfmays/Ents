@@ -6,7 +6,6 @@
 <form action="{% url 'index' %}" method="post">
     {% csrf_token %}
     <h1> Enrichment Items</h1>
-    <p><br>Enter a search string if desired,<br>then tap outside the box to search.<br>Finally, choose an item to see the photo.<br></p>
     {{ form.as_p }}
     <img id="image-1" src="" class="img-fluid" alt="..." >
     {% comment %} <input type="submit" value="Submit"> {% endcomment %}
