@@ -1,6 +1,13 @@
+{% extends "base_generic.html" %} 
+
+{% block content %}
+
 <h2>Log In</h2>
+<p>Logging in is only required for uploading new items or using the admin panel.<p>
 <form method="post">
   {% csrf_token %}
   {{ form.as_p }}
   <button type="submit">Log In</button>
 </form>
+
+{% endblock %}
