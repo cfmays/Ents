@@ -1,3 +1,4 @@
+from operator import truediv
 from os import name
 from django.http.response import JsonResponse
 from django.shortcuts import render
@@ -49,8 +50,13 @@ def ajax_load_searchstring_items(request):
     #import ipdb; ipdb.set_trace()
     
     theSearchString=request.GET.get('theSearchString')
+    theDoSearch=request.GET.get('theDoSearch')
+    #print('theDoSearch; ' + theDoSearch)
     #print('theSearchString: ' + theSearchString)
-    theItems = list(Enrichment.objects.values('id','name').filter(name__icontains=theSearchString))
+    if (theDoSearch == 'true'):
+        theItems = list(Enrichment.objects.values('id','name').filter(name__icontains=theSearchString))
+    else:
+        theItems = list(Enrichment.objects.values('id','name').all())
     #print('theItems: ')
     #print(theItems)
     return render(request, 'items_dropdown_list_options.html', {'theItems': theItems})
