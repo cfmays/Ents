@@ -32,9 +32,6 @@
         1. `git pull`
     1. deploy changes
         1. `source /home/charley/vents/bin/activate`
-        1. `source ~/ents.env`
-        1. `export ENT_ALLOWED_HOSTS`
-        1. `export ENT_MEDIA_ROOT`
         1. `python3 manage.py collectstatic`
         1. `python3 manage.py migrate`
         1. `sudo systemctl restart entsgunicorn.service`
