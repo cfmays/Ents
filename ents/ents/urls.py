@@ -20,6 +20,11 @@ from django.contrib.auth import views as auth_views
 from django.conf.urls.static import static
 from . import settings
 
+
+admin.site.site_header = "Enrichments Admin"
+admin.site.site_title = "Enrichments Admin Portal"
+admin.site.index_title = "Welcome to Enrichments Admin Portal"
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('',views.index, name='index'),
