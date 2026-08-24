@@ -51,25 +51,6 @@
 
     }); {% endcomment %}
 
-{% comment %} 
-    $("#id_keywords").change(function () {
-      url = "{% url 'ajax_load_items' %}"
-      var theKeyWord = $(this).val();  
-
-      $.ajax({                       
-        url: url,                    
-        data: {
-          'theKeyWord': theKeyWord     
-        },
-        success: function (data) {   
-            console.log(data)
-          $("#id_items").html(data);  
-        }
-      });
-
-    }); {% endcomment %}
-
-
     $("#id_items").change(function () {
         url = "{% url 'ajax_get_image_url' %}"
         var theItem = $(this).val();

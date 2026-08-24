@@ -62,14 +62,6 @@ def ajax_load_searchstring_items(request):
     #print(theItems)
     return render(request, 'items_dropdown_list_options.html', {'theItems': theItems})
     
-def ajax_load_items(request):
-    #print (request)
-    #import ipdb; ipdb.set_trace()
-    
-    theKeyWord=request.GET.get('theKeyWord')
-    theItems = list(Enrichment.objects.values('id','name').filter(keywords__in=theKeyWord))
-    return render(request, 'items_dropdown_list_options.html', {'theItems': theItems})
-
 def ajax_get_image_url(request):
     theItemID = request.GET.get('theItem')
     if not theItemID:
