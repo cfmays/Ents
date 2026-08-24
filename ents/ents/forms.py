@@ -1,6 +1,6 @@
 from django.forms import Form
 from django import forms
-from .models import Enrichment, KeyWord
+from .models import Enrichment
 
 class test(forms.ModelForm):
     model = Enrichment

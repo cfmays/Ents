@@ -1,4 +1,3 @@
-from wsgiref.validate import validator
 from django.db import models
 from django.core.validators import validate_image_file_extension
 import os

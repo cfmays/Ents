@@ -1,11 +1,7 @@
-from operator import truediv
-from os import name
 from django.http.response import JsonResponse
 from django.shortcuts import render
-from django.views.generic.edit import CreateView
 from .models import Enrichment
-from django.shortcuts import redirect
-from django.contrib.auth import logout, login
+from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseRedirect
 from django.urls import reverse
@@ -70,7 +66,3 @@ def ajax_get_image_url(request):
     if not results:
         return JsonResponse({'theURL': ''})
     return JsonResponse({'theURL': f"{MEDIA_URL}{results[0].photo.name}"})
-
-from django.urls import path
-
-
