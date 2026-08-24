@@ -19,6 +19,7 @@ def index(request):
 
 
 
+@login_required
 def EnrichmentUploadView(request):
     if request.method == 'POST':
         #print('in POST')
@@ -71,8 +72,11 @@ def ajax_load_items(request):
 
 def ajax_get_image_url(request):
     theItemID = request.GET.get('theItem')
-    # print('theItemID: ' + theItemID)
+    if not theItemID:
+        return JsonResponse({'theURL': ''})
     results = Enrichment.objects.all().filter(id=theItemID)
+    if not results:
+        return JsonResponse({'theURL': ''})
     return JsonResponse({'theURL': f"{MEDIA_URL}{results[0].photo.name}"})
 
 from django.urls import path
