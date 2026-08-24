@@ -5,7 +5,6 @@ decorator==5.1.0
 Django==3.2.9
 # added by Claude:
 django-environ==0.14.0
-django-safedelete==1.1.1
 ipdb==0.13.9
 ipython==7.30.0
 jedi==0.18.1
