@@ -51,9 +51,9 @@ def ajax_load_searchstring_items(request):
     #print('theDoSearch; ' + theDoSearch)
     #print('theSearchString: ' + theSearchString)
     if (theDoSearch == 'true'):
-        theItems = list(Enrichment.objects.values('id','name').filter(name__icontains=theSearchString))
+        theItems = Enrichment.objects.filter(name__icontains=theSearchString)
     else:
-        theItems = list(Enrichment.objects.values('id','name').all())
+        theItems = Enrichment.objects.all()
     #print('theItems: ')
     #print(theItems)
     return render(request, 'items_dropdown_list_options.html', {'theItems': theItems})

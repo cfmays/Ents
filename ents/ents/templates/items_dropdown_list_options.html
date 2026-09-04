@@ -1,4 +1,4 @@
 <option value="">---------</option>
 {% for item in theItems %}
-<option value="{{ item.id }}">{{ item.name }}</option>
+<option value="{{ item.id }}" data-thumb="{{ item.photo.url }}">{{ item.name }}</option>
 {% endfor %}

@@ -3,6 +3,7 @@
 {% block content %}
 
 {% comment %} <p>exportform.html</p> {% endcomment %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css">
 <form action="{% url 'index' %}" method="post">
     {% csrf_token %}
     <h1> Enrichment Items</h1>
@@ -12,7 +13,29 @@
 
 
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
   <script>
+
+    // shows the item's thumbnail (from data-thumb) next to its name in the dropdown
+    function formatItemWithThumb(item) {
+      if (!item.id) {
+        return item.text;
+      }
+      var thumbUrl = $(item.element).data("thumb");
+      if (!thumbUrl) {
+        return item.text;
+      }
+      return $(
+        '<span><img src="' + thumbUrl + '" style="height:56px;width:56px;object-fit:cover;border-radius:4px;margin-right:8px;vertical-align:middle;">' +
+        item.text + '</span>'
+      );
+    }
+
+    $("#id_items").select2({
+      width: "100%",
+      templateResult: formatItemWithThumb,
+      templateSelection: formatItemWithThumb
+    });
 
     $("#id_doSearch").change(function () {
       url = "{% url 'ajax_load_searchstring_items' %}"
@@ -27,8 +50,8 @@
           'theDoSearch': theDoSearch,
           'theSearchString': theSearchString     
         },
-        success: function (data) {   
-          $("#id_items").html(data);  
+        success: function (data) {
+          $("#id_items").html(data).trigger("change");
         }
       });
 
