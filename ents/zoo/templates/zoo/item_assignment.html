@@ -7,6 +7,8 @@
   .select2-results__option { white-space: normal; overflow-wrap: anywhere; }
   .select2-selection--multiple .select2-selection__choice { white-space: normal; overflow-wrap: anywhere; max-width: 100%; }
   .select2-selection--multiple .select2-selection__choice__display { white-space: normal; text-overflow: clip; overflow: visible; }
+  /* the placeholder was clipped: the search field inherited the page font but not enough height */
+  .select2-selection--multiple .select2-search__field { font-size: 14px !important; height: 28px !important; line-height: 28px !important; margin-top: 0 !important; }
 </style>
 <h1>Item &harr; Calendar Assignments</h1>
 
