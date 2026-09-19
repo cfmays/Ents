@@ -44,7 +44,6 @@
           {% endif %} 
           
           {% if user.is_authenticated %}
-          {% url 'createView' as createView_url %}
           <li class="nav-item">
             <a class="nav-link" href="{% url 'zoo:asg_list' %}">Enrichment Calendars</a>
           </li>
@@ -54,9 +53,6 @@
           {% if user|is_supervisor %}
           <li class="nav-item">
             <a class="nav-link" href="{% url 'zoo:item_assignment' %}">Item Assignments</a>
-          </li>
-          <li class="nav-item{% if request.path == createView_url %} active{% endif %}">
-            <a class="nav-link" href="{% url 'createView' %}">New Item</a>
           </li>
           {% endif %}
           <li class="nav-item">

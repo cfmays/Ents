@@ -1,4 +1,5 @@
 {% extends "base_generic.html" %} 
+{% load zoo_extras %}
 
 {% block content %}
 
@@ -14,6 +15,7 @@
 <form action="{% url 'index' %}" method="post">
     {% csrf_token %}
     <h1> Enrichment Items</h1>
+    {% if user|is_supervisor %}<p><a href="{% url 'createView' %}">New Item</a></p>{% endif %}
     {{ form.as_p }}
     <img id="image-1" src="" class="img-fluid" alt="..." >
     {% comment %} <input type="submit" value="Submit"> {% endcomment %}

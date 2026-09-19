@@ -104,18 +104,19 @@ class EnrichmentUploadViewTests(TestCase):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
 
-    def test_nav_hides_new_item_link_for_non_supervisor(self):
+    def test_index_hides_new_item_link_for_non_supervisor(self):
         User.objects.create_user(username='carol', password='password123')
         self.client.login(username='carol', password='password123')
         response = self.client.get(reverse('index'))
         self.assertNotContains(response, 'New Item')
 
-    def test_nav_shows_new_item_link_for_supervisor(self):
+    def test_index_shows_new_item_link_for_supervisor(self):
         self.client.login(username='alice', password='password123')
         response = self.client.get(reverse('index'))
         self.assertContains(response, 'New Item')
+        self.assertNotContains(self.client.get(reverse('zoo:asg_list')), 'New Item')  # no longer in the menu bar
 
-    def test_nav_shows_new_item_link_for_superuser(self):
+    def test_index_shows_new_item_link_for_superuser(self):
         User.objects.create_superuser(username='root2', email='root2@example.com', password='password123')
         self.client.login(username='root2', password='password123')
         response = self.client.get(reverse('index'))

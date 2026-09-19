@@ -1,6 +1,13 @@
 {% extends "base_generic.html" %}
 
 {% block content %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css">
+<style>
+  /* long item names wrap instead of stretching the page */
+  .select2-results__option { white-space: normal; overflow-wrap: anywhere; }
+  .select2-selection--multiple .select2-selection__choice { white-space: normal; overflow-wrap: anywhere; max-width: 100%; }
+  .select2-selection--multiple .select2-selection__choice__display { white-space: normal; text-overflow: clip; overflow: visible; }
+</style>
 <h1>Item &harr; Calendar Assignments</h1>
 
 <h4>Look up an item's calendars</h4>
@@ -21,8 +28,12 @@
   <button type="submit" class="btn btn-primary">Assign</button>
 </form>
 
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
+  // searchable, wrapping item list at about half the page width
+  $("#id_items").select2({ width: "50%", placeholder: "Search and pick one or more items" });
+
+
   $("#lookup-item").change(function () {
     var itemId = $(this).val();
     var resultEl = $("#lookup-result");
