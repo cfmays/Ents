@@ -14,7 +14,7 @@ from django.urls import reverse
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
-from .forms import item_labels_for, AddAnimalChoiceForm, AddBehaviorGoalForm, ItemAssignmentForm, TrainingSessionForm, TrainingStringForm, make_calendar_entry_formset
+from .forms import item_labels_for, AddAnimalChoiceForm, ItemAssignmentForm, TrainingSessionForm, TrainingStringForm, make_calendar_entry_formset
 from ents.models import Enrichment
 from .models import Division, Behavior, Reinforcer, ASG, ASGApprovedItem, Animal, default_is_food, BehaviorGoal, BehaviorScore, CalendarEntry, Profile, SpecialConcern, String, TrainingAnimal, TrainingSession
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -44,7 +44,7 @@ def asg_list(request):
     else:
         strings = String.objects.filter(Q(keepers=request.user) | Q(division__in=scope)).distinct()
     strings = strings.prefetch_related('asgs')
-    return render(request, 'zoo/asg_list.html', {'strings': strings})
+    return render(request, 'zoo/asg_list.html', {'strings': strings, 'can_manage_lists': is_supervisor(request.user)})
 
 
 # never cached, so Back from the print page shows what was just saved, not an old copy
@@ -90,6 +90,7 @@ def calendar_tab(request, asg_id, year=None, month=None):
     return render(request, 'zoo/calendar_tab.html', {
         'asg': asg,
         'clipboard': clipboard,
+        'can_manage_lists': is_supervisor(request.user),
         'formset': formset,
         'year': year,
         'month': month,
@@ -274,11 +275,10 @@ def _change_concerns_or_goals(request, asg):
         messages.success(request, 'Behavior goal added.')
 
 
-@login_required
+@supervisor_required
 def list_management_tab(request, asg_id):
     asg = _get_accessible_asg(request, asg_id)
 
-    form = AddBehaviorGoalForm(asg=asg)
     animal_form = AddAnimalChoiceForm(asg=asg)
 
     if request.method == 'POST':
@@ -293,21 +293,11 @@ def list_management_tab(request, asg_id):
                 messages.success(request, 'Animal choice added.')
                 return redirect('zoo:list_management_tab', asg_id=asg.id)
         elif any(key in request.POST for key in ('add_concern', 'add_goal_text', 'remove_concern', 'remove_goal')):
-            if not is_supervisor(request.user):
-                raise PermissionDenied('Only supervisors can change special concerns and behavior goals.')
             _change_concerns_or_goals(request, asg)
             return redirect('zoo:list_management_tab', asg_id=asg.id)
         elif 'add_item' in request.POST or 'remove_item' in request.POST:
-            if not is_supervisor(request.user):
-                raise PermissionDenied('Only supervisors can change approved items.')
             _change_items(request, asg)
             return redirect('zoo:list_management_tab', asg_id=asg.id)
-        else:
-            form = AddBehaviorGoalForm(request.POST, asg=asg)
-            if form.is_valid():
-                asg.behavior_goals.add(form.cleaned_data['behavior_goal'])
-                messages.success(request, 'Behavior goal added.')
-                return redirect('zoo:list_management_tab', asg_id=asg.id)
 
     assignments = ASGApprovedItem.objects.filter(asg=asg).select_related('item')
     food_items = assignments.filter(is_food=True)
@@ -315,9 +305,7 @@ def list_management_tab(request, asg_id):
 
     return render(request, 'zoo/list_management_tab.html', {
         'asg': asg,
-        'form': form,
         'animal_form': animal_form,
-        'can_edit_lists': is_supervisor(request.user),
         'concern_suggestions': SpecialConcern.objects.exclude(asgs=asg),
         'goal_suggestions': BehaviorGoal.objects.exclude(asgs=asg),
         'columns': [

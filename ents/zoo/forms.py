@@ -7,7 +7,7 @@ from django.forms import modelformset_factory
 from ents.forms import EnrichmentSelect
 from ents.models import Enrichment
 
-from .models import ASG, Animal, BehaviorGoal, CalendarEntry, Reinforcer, SCALE_1_5, String
+from .models import ASG, Animal, CalendarEntry, Reinforcer, SCALE_1_5, String
 
 
 def item_labels_for(asg):
@@ -76,15 +76,6 @@ def make_calendar_entry_formset(asg, year, month, extra=5):
     form_class = make_calendar_entry_form(asg, year, month)
     FormSet = modelformset_factory(CalendarEntry, form=form_class, extra=extra, can_delete=False)
     return FormSet
-
-
-class AddBehaviorGoalForm(forms.Form):
-    behavior_goal = forms.ModelChoiceField(queryset=BehaviorGoal.objects.all(), label='Add a behavior goal')
-
-    def __init__(self, *args, asg=None, **kwargs):
-        super().__init__(*args, **kwargs)
-        if asg is not None:
-            self.fields['behavior_goal'].queryset = BehaviorGoal.objects.exclude(asgs=asg)
 
 
 class AddAnimalChoiceForm(forms.ModelForm):

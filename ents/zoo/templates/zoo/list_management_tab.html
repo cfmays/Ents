@@ -33,18 +33,18 @@
   {% for concern in asg.special_concerns.all %}
   <li>
     {{ concern.text }}
-    {% if can_edit_lists %}
+    
     <form method="post" class="d-inline" onsubmit="return confirm('Remove this special concern from {{ asg.name|escapejs }}?');">
       {% csrf_token %}
       <button type="submit" name="remove_concern" value="{{ concern.id }}" class="btn btn-link btn-sm text-danger">remove</button>
     </form>
-    {% endif %}
+    
   </li>
   {% empty %}
   <li><em>None</em></li>
   {% endfor %}
 </ul>
-{% if can_edit_lists %}
+
 <form method="post" class="mb-3" style="display:flex;gap:8px;align-items:center">
   {% csrf_token %}
   <input type="text" name="add_concern" list="concern-suggestions" maxlength="500" class="form-control" style="width:500px" placeholder="Type a new concern, or pick an existing one">
@@ -53,25 +53,25 @@
   </datalist>
   <button type="submit" class="btn btn-sm btn-secondary">Add concern</button>
 </form>
-{% endif %}
+
 
 <h4>Behavior goals</h4>
 <ul>
   {% for goal in asg.behavior_goals.all %}
   <li>
     {{ goal.name }}
-    {% if can_edit_lists %}
+    
     <form method="post" class="d-inline" onsubmit="return confirm('Remove this behavior goal from {{ asg.name|escapejs }}?');">
       {% csrf_token %}
       <button type="submit" name="remove_goal" value="{{ goal.id }}" class="btn btn-link btn-sm text-danger">remove</button>
     </form>
-    {% endif %}
+    
   </li>
   {% empty %}
   <li><em>None</em></li>
   {% endfor %}
 </ul>
-{% if can_edit_lists %}
+
 <form method="post" style="display:flex;gap:8px;align-items:center">
   {% csrf_token %}
   <input type="text" name="add_goal_text" list="goal-suggestions" maxlength="255" class="form-control" style="width:400px" placeholder="Type a new goal, or pick an existing one">
@@ -80,13 +80,7 @@
   </datalist>
   <button type="submit" class="btn btn-sm btn-secondary">Add goal</button>
 </form>
-{% else %}
-<form method="post" class="form-inline">
-  {% csrf_token %}
-  {{ form.behavior_goal }}
-  <button type="submit" class="btn btn-sm btn-secondary">Add goal</button>
-</form>
-{% endif %}
+
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css">
 <style>
@@ -99,7 +93,7 @@
   {% for title, kind, choices, assignments in columns %}
   <div class="col-md-6">
     <h4>{{ title }} <span class="text-muted" style="font-size:0.9rem; font-weight:normal; margin-left:8px">{{ assignments|length }} item{{ assignments|length|pluralize }}</span></h4>
-    {% if can_edit_lists %}
+    
     <form method="post" class="mb-3 p-2 border rounded">
       {% csrf_token %}
       <select name="item" class="item-pick" style="width:100%">
@@ -112,7 +106,7 @@
         <button type="submit" name="add_item" value="{{ kind }}" class="btn btn-sm btn-secondary" style="white-space:nowrap">Add item</button>
       </div>
     </form>
-    {% endif %}
+    
 
     {% for assignment in assignments %}
     <div class="item-row">
@@ -126,12 +120,12 @@
         {% if assignment.comments %}<div class="text-muted small">{{ assignment.comments }}</div>{% endif %}
         {% if assignment.rate %}<div class="text-muted small">Rate: {{ assignment.rate }}</div>{% endif %}
       </div>
-      {% if can_edit_lists %}
+      
       <form method="post" onsubmit="return confirm('Remove this item from {{ asg.name|escapejs }}?');">
         {% csrf_token %}
         <button type="submit" name="remove_item" value="{{ assignment.id }}" class="btn btn-link btn-sm text-danger">remove</button>
       </form>
-      {% endif %}
+      
     </div>
     {% empty %}
     <p><em>None</em></p>
@@ -140,7 +134,7 @@
   {% endfor %}
 </div>
 
-{% if can_edit_lists %}
+
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
   function formatItem(item) {
@@ -155,7 +149,7 @@
     $(this).data("select2").$dropdown.addClass("item-pick-dropdown");
   });
 </script>
-{% endif %}
+
 <script>
   // keep the page where it was after any add/remove on this page
   document.querySelectorAll("form").forEach(function (form) {

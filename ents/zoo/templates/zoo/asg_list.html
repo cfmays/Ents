@@ -12,7 +12,7 @@
     {{ asg.name }}
     &mdash;
     <a href="{% url 'zoo:calendar_tab' asg.id %}">Calendar</a> |
-    <a href="{% url 'zoo:list_management_tab' asg.id %}">List management</a> |
+    {% if can_manage_lists %}<a href="{% url 'zoo:list_management_tab' asg.id %}">List management</a> |{% endif %}
     <a href="{% url 'zoo:reporting_view' asg.id %}">History</a>
   </li>
   {% empty %}

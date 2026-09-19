@@ -41,7 +41,7 @@
   <a id="print-link" class="btn btn-outline-secondary btn-sm" href="{% url 'zoo:calendar_print' asg.id year month %}" target="_blank" title="Prints the saved entries">Print</a>
 </div>
 <p class="mt-2">
-  <a href="{% url 'zoo:list_management_tab' asg.id %}">List management</a> |
+  {% if can_manage_lists %}<a href="{% url 'zoo:list_management_tab' asg.id %}">List management</a> |{% endif %}
   <a href="{% url 'zoo:reporting_view' asg.id %}">History</a>
 </p>
 

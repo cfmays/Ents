@@ -313,7 +313,7 @@ class KeeperAccessScopingTests(TestCase):
         self.assertContains(response, 'only works within the same calendar')
         self.assertFalse(CalendarEntry.objects.filter(asg=self.asg).exists())
 
-    def test_supervisor_can_add_and_remove_concerns_and_goals_but_keeper_cannot(self):
+    def test_supervisor_can_add_and_remove_concerns_and_goals(self):
         supervisor_group, _ = Group.objects.get_or_create(name='Supervisor')
         supervisor = User.objects.create_user('boss3', password='pw', is_staff=True)
         supervisor.groups.add(supervisor_group)
@@ -338,9 +338,8 @@ class KeeperAccessScopingTests(TestCase):
         self.assertEqual(self.client.post(url, {'add_concern': 'Sneaky'}).status_code, 403)
         self.assertEqual(self.client.post(url, {'remove_concern': concern.id}).status_code, 403)
         self.assertFalse(SpecialConcern.objects.filter(text='Sneaky').exists())
-        self.assertNotContains(self.client.get(url), 'Add concern')
 
-    def test_supervisor_can_add_and_remove_approved_items_but_keeper_cannot(self):
+    def test_supervisor_can_add_and_remove_approved_items(self):
         supervisor_group, _ = Group.objects.get_or_create(name='Supervisor')
         supervisor = User.objects.create_user('boss4', password='pw', is_staff=True)
         supervisor.groups.add(supervisor_group)
@@ -368,10 +367,22 @@ class KeeperAccessScopingTests(TestCase):
         self.assertEqual(self.client.post(url, {'add_item': 'food', 'item': item.id, 'comments': 'x'}).status_code, 403)
         self.assertEqual(self.client.post(url, {'remove_item': rows.get().id}).status_code, 403)
         self.assertEqual(rows.count(), 1)
-        self.assertNotContains(self.client.get(url), 'Add item')
 
-    def test_keeper_can_add_and_remove_animal_choice(self):
-        self.client.force_login(self.assigned_keeper)
+    def test_list_management_is_for_supervisors_only(self):
+        url = reverse('zoo:list_management_tab', args=[self.asg.id])
+        for page in (reverse('zoo:calendar_tab', args=[self.asg.id]), reverse('zoo:asg_list')):
+            self.client.force_login(self.assigned_keeper)
+            self.assertNotContains(self.client.get(page), 'List management')
+        self.assertEqual(self.client.get(url).status_code, 403)
+        self.assertEqual(self.client.post(url, {'name': 'Sneaky'}).status_code, 403)
+
+        self.client.force_login(self.matching_supervisor)
+        self.assertContains(self.client.get(reverse('zoo:calendar_tab', args=[self.asg.id])), 'List management')
+        self.assertContains(self.client.get(reverse('zoo:asg_list')), 'List management')
+        self.assertEqual(self.client.get(url).status_code, 200)
+
+    def test_supervisor_can_add_and_remove_animal_choice(self):
+        self.client.force_login(self.matching_supervisor)
         url = reverse('zoo:list_management_tab', args=[self.asg.id])
         self.client.post(url, {'name': 'Rocky/ Raza'})
         choice = self.asg.animals.get()
