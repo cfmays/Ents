@@ -164,7 +164,7 @@ class ItemAssignmentForm(forms.Form):
     items = forms.ModelMultipleChoiceField(queryset=Enrichment.objects.all(), widget=forms.SelectMultiple(attrs={'size': 10}))
     asgs = forms.ModelMultipleChoiceField(queryset=ASG.objects.all(), widget=forms.SelectMultiple(attrs={'size': 10}), label='Calendars')
 
-    def __init__(self, *args, user=None, **kwargs):
+    def __init__(self, *args, divisions=None, **kwargs):
         super().__init__(*args, **kwargs)
-        if user is not None and not user.is_superuser:
-            self.fields['asgs'].queryset = ASG.objects.filter(string__division__in=user.profile.divisions.all())
+        if divisions is not None:
+            self.fields['asgs'].queryset = ASG.objects.filter(string__division__in=divisions)

@@ -130,7 +130,7 @@
     </div>
   </details>
   {% empty %}
-  <p><em>No strings to manage.</em></p>
+  <p><em>{% if divisions %}No strings to manage.{% else %}You are not assigned to a division yet, so there are no strings for you to manage. Ask a superuser to add your division to your profile in the admin panel.{% endif %}</em></p>
   {% endfor %}
 </form>
 

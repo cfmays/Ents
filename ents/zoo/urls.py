@@ -15,6 +15,7 @@ urlpatterns = [
 
     path('training/', views.training_start, name='training_start'),
     path('training/ajax_animals_for_string/', views.training_ajax_animals_for_string, name='training_ajax_animals_for_string'),
+    path('divisions/', views.set_divisions, name='set_divisions'),
     path('training/manage/', views.manage_training, name='manage_training'),
     path('training/animal/<int:animal_id>/', views.training_entry, name='training_entry'),
 

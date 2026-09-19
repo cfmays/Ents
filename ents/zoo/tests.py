@@ -467,6 +467,12 @@ class ManageTrainingTests(TestCase):
         self.assertEqual(self.client.post(self.url, {'do': f'delete_animal:{self.animal_b.id}'}).status_code, 404)
         self.assertTrue(TrainingAnimal.objects.filter(pk=self.animal_b.pk).exists())
 
+    def test_supervisor_without_division_is_told_why_the_page_is_empty(self):
+        loner = User.objects.create_user('loner', password='pw', is_staff=True)
+        loner.groups.add(Group.objects.get(name='Supervisor'))
+        self.client.force_login(loner)
+        self.assertContains(self.client.get(self.url), 'not assigned to a division')
+
     def test_strings_add_rename_delete(self):
         self.client.force_login(self.supervisor)
         self.post('add_string', new_string='New String')
@@ -524,3 +530,71 @@ class ManageTrainingTests(TestCase):
         self.post(f'remove_reinforcer:{aid}:{self.animal.reinforcers.get().id}')
         self.assertEqual(self.animal.maintenance_behaviors.count(), 1)
         self.assertFalse(self.animal.reinforcers.exists())
+
+
+@override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
+class WorkingDivisionTests(TestCase):
+
+    def setUp(self):
+        self.terrestrial = Division.objects.create(name='Terrestrial')
+        self.aquatic = Division.objects.create(name='Aquatic')
+        self.string_t = String.objects.create(name='Tiger String', division=self.terrestrial)
+        self.string_a = String.objects.create(name='Penguin String', division=self.aquatic)
+        ASG.objects.create(name='Tiger', string=self.string_t)
+        ASG.objects.create(name='Penguins', string=self.string_a)
+        group, _ = Group.objects.get_or_create(name='Supervisor')
+        self.both = User.objects.create_user('both', password='pw', is_staff=True)
+        self.both.groups.add(group)
+        self.both.profile.divisions.add(self.terrestrial, self.aquatic)
+        self.one = User.objects.create_user('one', password='pw', is_staff=True)
+        self.one.groups.add(group)
+        self.one.profile.divisions.add(self.terrestrial)
+        self.keeper = User.objects.create_user('kay', password='pw')
+        self.root = User.objects.create_superuser('rootw', 'r@example.com', 'pw')
+
+    def pick(self, *divisions, next_url=None):
+        return self.client.post(reverse('zoo:set_divisions'), {
+            'division': [d.id for d in divisions], 'next': next_url or reverse('zoo:asg_list'),
+        }, follow=True)
+
+    def test_checkboxes_only_for_people_with_more_than_one_division(self):
+        for user, expected in ((self.both, True), (self.root, True), (self.one, False), (self.keeper, False)):
+            self.client.force_login(user)
+            self.assertEqual('Working in:' in self.client.get(reverse('zoo:asg_list')).content.decode(), expected, user.username)
+
+    def test_ticking_divisions_filters_calendars_and_manage_page(self):
+        self.client.force_login(self.both)
+        page = self.client.get(reverse('zoo:asg_list'))
+        self.assertContains(page, 'Tiger String')
+        self.assertContains(page, 'Penguin String')  # everything ticked by default
+
+        self.pick(self.terrestrial)
+        for url in (reverse('zoo:asg_list'), reverse('zoo:manage_training')):
+            page = self.client.get(url)
+            self.assertContains(page, 'Tiger String')
+            self.assertNotContains(page, 'Penguin String')
+
+        self.pick(self.aquatic, self.terrestrial)
+        self.assertContains(self.client.get(reverse('zoo:asg_list')), 'Penguin String')
+
+    def test_unticking_everything_is_refused(self):
+        self.client.force_login(self.both)
+        self.pick(self.aquatic)
+        response = self.pick()
+        self.assertContains(response, 'Keep at least one division ticked.')
+        self.assertNotContains(self.client.get(reverse('zoo:asg_list')), 'Tiger String')  # still just Aquatic
+
+    def test_superuser_filter_and_item_assignment_scope(self):
+        self.client.force_login(self.root)
+        self.pick(self.aquatic)
+        page = self.client.get(reverse('zoo:asg_list'))
+        self.assertNotContains(page, 'Tiger String')
+        assignment_page = self.client.get(reverse('zoo:item_assignment'))
+        self.assertContains(assignment_page, 'Penguins')
+        self.assertNotContains(assignment_page, '>Tiger<')
+
+    def test_cannot_pick_a_division_you_do_not_have_or_redirect_off_site(self):
+        self.client.force_login(self.one)
+        response = self.client.post(reverse('zoo:set_divisions'), {'division': [self.aquatic.id], 'next': 'https://evil.example/'})
+        self.assertRedirects(response, reverse('zoo:asg_list'))
+        self.assertNotContains(self.client.get(reverse('zoo:asg_list')), 'Penguin String')

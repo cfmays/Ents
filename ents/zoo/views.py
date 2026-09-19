@@ -16,7 +16,9 @@ from django.views.decorators.http import require_POST
 from .forms import AddAnimalChoiceForm, AddBehaviorGoalForm, ItemAssignmentForm, TrainingSessionForm, TrainingStringForm, make_calendar_entry_formset
 from ents.models import Enrichment
 from .models import Division, Behavior, Reinforcer, ASG, ASGApprovedItem, Animal, default_is_food, BehaviorGoal, BehaviorScore, CalendarEntry, Profile, SpecialConcern, String, TrainingAnimal, TrainingSession
-from .permissions import is_supervisor, supervisor_required, user_can_access_asg, user_can_access_string, user_can_access_training_animal
+from django.utils.http import url_has_allowed_host_and_scheme
+
+from .permissions import available_divisions, division_scope, is_supervisor, supervisor_required, user_can_access_asg, user_can_access_string, user_can_access_training_animal
 
 
 def _get_accessible_asg(request, asg_id):
@@ -35,12 +37,11 @@ def _get_accessible_training_animal(request, animal_id):
 
 @login_required
 def asg_list(request):
+    scope = division_scope(request)
     if request.user.is_superuser:
-        strings = String.objects.all()
+        strings = String.objects.all() if scope is None else String.objects.filter(division__in=scope)
     else:
-        profile = getattr(request.user, 'profile', None)
-        divisions = profile.divisions.all() if profile else []
-        strings = String.objects.filter(Q(keepers=request.user) | Q(division__in=divisions)).distinct()
+        strings = String.objects.filter(Q(keepers=request.user) | Q(division__in=scope)).distinct()
     strings = strings.prefetch_related('asgs')
     return render(request, 'zoo/asg_list.html', {'strings': strings})
 
@@ -369,7 +370,7 @@ def training_entry(request, animal_id):
 @supervisor_required
 def item_assignment_view(request):
     if request.method == 'POST':
-        form = ItemAssignmentForm(request.POST, user=request.user)
+        form = ItemAssignmentForm(request.POST, divisions=division_scope(request))
         if form.is_valid():
             created = 0
             for item in form.cleaned_data['items']:
@@ -379,7 +380,7 @@ def item_assignment_view(request):
             messages.success(request, f'Created {created} new item/calendar assignment(s).')
             return redirect('zoo:item_assignment')
     else:
-        form = ItemAssignmentForm(user=request.user)
+        form = ItemAssignmentForm(divisions=division_scope(request))
 
     return render(request, 'zoo/item_assignment.html', {'form': form})
 
@@ -388,8 +389,9 @@ def item_assignment_view(request):
 def item_ajax_asgs_for_item(request):
     item_id = request.GET.get('item_id')
     asgs = ASG.objects.filter(item_assignments__item_id=item_id) if item_id else ASG.objects.none()
-    if not request.user.is_superuser:
-        asgs = asgs.filter(string__division__in=request.user.profile.divisions.all())
+    scope = division_scope(request)
+    if scope is not None:
+        asgs = asgs.filter(string__division__in=scope)
     return JsonResponse({'asgs': [asg.name for asg in asgs]})
 
 
@@ -399,19 +401,14 @@ def _clean(text):
     return re.sub(r'\s+', ' ', text or '').strip()
 
 
-def _manageable_strings(user):
-    """Superusers manage every string; supervisors only those in their divisions."""
-    if user.is_superuser:
-        return String.objects.all()
-    profile = getattr(user, 'profile', None)
-    return String.objects.filter(division__in=profile.divisions.all()) if profile else String.objects.none()
+def _manageable_strings(request):
+    """Strings in the divisions ticked in the title bar (superusers with all ticked: every string)."""
+    scope = division_scope(request)
+    return String.objects.all() if scope is None else String.objects.filter(division__in=scope)
 
 
 def _my_divisions(user):
-    if user.is_superuser:
-        return Division.objects.all()
-    profile = getattr(user, 'profile', None)
-    return profile.divisions.all() if profile else Division.objects.none()
+    return available_divisions(user)
 
 
 def _animal_for(strings, animal_id):
@@ -423,7 +420,8 @@ def _add_string(request, strings):
     divisions = _my_divisions(request.user)
     division = divisions.filter(pk=request.POST.get('new_string_division') or None).first()
     if division is None and not request.user.is_superuser:
-        division = divisions.first() if divisions.count() == 1 else None
+        working = division_scope(request)
+        division = working.first() if working.count() == 1 else None
         if division is None:
             messages.warning(request, 'Choose one of your divisions for the new string.')
             return
@@ -563,7 +561,7 @@ MANAGE_ACTIONS = {
 
 @supervisor_required
 def manage_training(request):
-    strings = _manageable_strings(request.user)
+    strings = _manageable_strings(request)
     if request.method == 'POST':
         verb, *ids = request.POST.get('do', '').split(':')
         handler = MANAGE_ACTIONS.get(verb)
@@ -588,3 +586,18 @@ def manage_training(request):
         'new_names': Behavior.objects.filter(behavior_type='new').values_list('name', flat=True),
         'reinforcer_names': Reinforcer.objects.values_list('name', flat=True),
     })
+
+
+@login_required
+@require_POST
+def set_divisions(request):
+    """Remember which divisions the user ticked in the title bar."""
+    chosen = available_divisions(request.user).filter(pk__in=request.POST.getlist('division'))
+    if chosen.exists():
+        request.session['working_divisions'] = list(chosen.values_list('id', flat=True))
+    else:
+        messages.warning(request, 'Keep at least one division ticked.')
+    next_url = request.POST.get('next', '')
+    if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+        next_url = reverse('zoo:asg_list')
+    return redirect(next_url)

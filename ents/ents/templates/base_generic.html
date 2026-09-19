@@ -65,6 +65,18 @@
           <li class="nav-item">
             <span class="nav-link pe-1">Logged in as <strong>{{ user.username|capfirst }}</strong></span>
           </li>
+          {% if division_picker %}
+          <li class="nav-item">
+            <form method="post" action="{% url 'zoo:set_divisions' %}" class="nav-link" style="display:flex;gap:10px;align-items:center;margin:0">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ request.get_full_path }}">
+              <span class="text-muted">Working in:</span>
+              {% for division, checked in division_picker %}
+              <label style="margin:0;white-space:nowrap"><input type="checkbox" name="division" value="{{ division.id }}"{% if checked %} checked{% endif %} onchange="this.form.submit()"> {{ division.name }}</label>
+              {% endfor %}
+            </form>
+          </li>
+          {% endif %}
 
           {% else %}
           <li class="nav-item">
