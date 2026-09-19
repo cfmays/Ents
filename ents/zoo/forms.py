@@ -1,3 +1,6 @@
+import calendar
+from datetime import date
+
 from django import forms
 from django.forms import modelformset_factory
 
@@ -20,8 +23,11 @@ def item_labels_for(asg):
     }
 
 
-def make_calendar_entry_form(asg):
-    """Build a CalendarEntry ModelForm whose choice fields are scoped to one calendar."""
+def make_calendar_entry_form(asg, year, month):
+    """Build a CalendarEntry ModelForm whose choice fields are scoped to one calendar and date picker to one month."""
+
+    first_day = date(year, month, 1)
+    last_day = date(year, month, calendar.monthrange(year, month)[1])
 
     labels = item_labels_for(asg)
 
@@ -47,13 +53,17 @@ def make_calendar_entry_form(asg):
             self.fields['behavior_goal'].queryset = asg.behavior_goals.all()
             self.fields['behavior_goal'].required = False
             self.fields['date'].required = False
+            self.fields['date'].widget.attrs.update({'min': first_day.isoformat(), 'max': last_day.isoformat()})
             self.fields['item'].required = False
 
         def clean(self):
             cleaned = super().clean()
+            entry_date = cleaned.get('date')
+            if entry_date and not first_day <= entry_date <= last_day:
+                self.add_error('date', f"Date must be in {first_day.strftime('%B %Y')}.")
             # blank rows are skipped by Django; a row with anything filled in needs a date and an item
             if self.has_changed():
-                if not cleaned.get('date'):
+                if not cleaned.get('date') and 'date' not in self.errors:
                     self.add_error('date', 'Please enter a date.')
                 if not cleaned.get('item'):
                     self.add_error('item', 'Please choose an enrichment item.')
@@ -62,8 +72,8 @@ def make_calendar_entry_form(asg):
     return CalendarEntryForm
 
 
-def make_calendar_entry_formset(asg, extra=5):
-    form_class = make_calendar_entry_form(asg)
+def make_calendar_entry_formset(asg, year, month, extra=5):
+    form_class = make_calendar_entry_form(asg, year, month)
     FormSet = modelformset_factory(CalendarEntry, form=form_class, extra=extra, can_delete=False)
     return FormSet
 

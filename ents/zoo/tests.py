@@ -182,6 +182,20 @@ class KeeperAccessScopingTests(TestCase):
         response = self.client.post(reverse('zoo:calendar_tab', args=[self.asg.id]), data)
         self.assertContains(response, 'Please choose an enrichment item.')
 
+    def test_saving_a_date_outside_the_month_shows_an_error(self):
+        item = Enrichment.objects.create(name='Ball', photo=make_image_file(name='ball.png'))
+        ASGApprovedItem.objects.create(asg=self.asg, item=item)
+        self.client.force_login(self.assigned_keeper)
+        data = {
+            'form-TOTAL_FORMS': '2', 'form-INITIAL_FORMS': '0', 'form-MIN_NUM_FORMS': '0', 'form-MAX_NUM_FORMS': '1000',
+            'form-0-date': '2026-09-05', 'form-0-item': str(item.id),
+            'form-1-date': '2026-10-05', 'form-1-item': str(item.id),
+        }
+        response = self.client.post(reverse('zoo:calendar_tab', args=[self.asg.id, 2026, 9]), data)
+        self.assertContains(response, 'Date must be in September 2026.')
+        self.assertNotContains(response, 'Please enter a date.')
+        self.assertFalse(CalendarEntry.objects.exists())  # nothing saved until the row is fixed
+
     def test_copy_and_paste_month_drops_days_that_do_not_exist(self):
         item = Enrichment.objects.create(name='Ball', photo=make_image_file(name='ball.png'))
         gone = Enrichment.objects.create(name='Rope', photo=make_image_file(name='rope.png'))

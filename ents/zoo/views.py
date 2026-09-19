@@ -53,7 +53,7 @@ def calendar_tab(request, asg_id, year=None, month=None):
     month_start = date(year, month, 1)
     month_end = date(year, month, days_in_month)
 
-    FormSet = make_calendar_entry_formset(asg)
+    FormSet = make_calendar_entry_formset(asg, year, month)
     queryset = CalendarEntry.objects.filter(asg=asg, date__gte=month_start, date__lte=month_end)
 
     if request.method == 'POST':
@@ -76,7 +76,7 @@ def calendar_tab(request, asg_id, year=None, month=None):
     clip = request.session.get('calendar_clipboard')
     clipboard = None
     if clip and clip['asg_id'] == asg.id:
-        clipboard = f"{len(clip['entries'])} entries from {_month_label(clip['year'], clip['month'])}"
+        clipboard = f"{_entries(len(clip['entries']))} from {_month_label(clip['year'], clip['month'])}"
 
     return render(request, 'zoo/calendar_tab.html', {
         'asg': asg,
@@ -107,7 +107,7 @@ def calendar_copy(request, asg_id, year, month):
     asg = _get_accessible_asg(request, asg_id)
     if 'form-TOTAL_FORMS' in request.POST:
         queryset = CalendarEntry.objects.filter(asg=asg, date__year=year, date__month=month)
-        formset = make_calendar_entry_formset(asg)(request.POST, queryset=queryset)
+        formset = make_calendar_entry_formset(asg, year, month)(request.POST, queryset=queryset)
         if not formset.is_valid():
             problems = []
             for form in formset.forms:
