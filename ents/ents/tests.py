@@ -186,6 +186,30 @@ class AjaxLoadSearchstringItemsTests(TestCase):
         self.assertContains(response, 'Ball')
         self.assertNotContains(response, 'Rope')
 
+    def test_up_to_three_search_strings_must_all_match_and_count_is_shown(self):
+        Enrichment.objects.create(name='Ball- 12in Tiger', photo=make_image_file(name='b12.png'))
+        Enrichment.objects.create(name='Ball- 6in Tiger', photo=make_image_file(name='b6.png'))
+        Enrichment.objects.create(name='Ball- 12in Wolf', photo=make_image_file(name='w12.png'))
+        response = self.client.get(reverse('ajax_load_searchstring_items'), {
+            'theSearchString': 'ball',
+            'theSearchString2': '12',
+            'theSearchString3': ' tiger ',
+            'theDoSearch': 'true',
+        })
+        self.assertContains(response, 'Ball- 12in Tiger')
+        self.assertNotContains(response, 'Ball- 6in Tiger')
+        self.assertNotContains(response, 'Ball- 12in Wolf')
+        self.assertContains(response, 'data-count-text="1 item"')
+
+        response = self.client.get(reverse('ajax_load_searchstring_items'), {'theSearchString': 'ball', 'theDoSearch': 'false'})
+        self.assertContains(response, 'data-count-text="5 items"')  # search off: everything
+
+    def test_index_header_shows_item_count(self):
+        response = self.client.get(reverse('index'))
+        self.assertContains(response, 'Select Item (2 items)')
+        self.assertContains(response, 'Enter search text')
+        self.assertContains(response, 'id_searchString3')
+
 
 @override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
 class AjaxGetImageUrlTests(TestCase):

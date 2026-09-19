@@ -44,25 +44,38 @@
       templateSelection: formatItemWithThumb
     });
 
-    $("#id_doSearch").change(function () {
-      url = "{% url 'ajax_load_searchstring_items' %}"
-      
-      
-      var theDoSearch = this.checked;
-      var theSearchString = $("#id_searchString").val();
+    // filter the dropdown by up to three search strings (an item must contain all of them)
+    function runSearch() {
+      var theDoSearch = $("#id_doSearch").prop("checked");
 
-      $.ajax({                       
-        url: url,                    
+      $.ajax({
+        url: "{% url 'ajax_load_searchstring_items' %}",
         data: {
           'theDoSearch': theDoSearch,
-          'theSearchString': theSearchString     
+          'theSearchString': $("#id_searchString").val(),
+          'theSearchString2': $("#id_searchString2").val(),
+          'theSearchString3': $("#id_searchString3").val()
         },
         success: function (data) {
           $("#id_items").html(data).trigger("change");
+          // the header line shows how many items are in the dropdown
+          var countText = $("#id_items option").first().data("count-text");
+          $("label[for=id_items]").text("Select Item (" + countText + "):");
         }
       });
+    }
 
+    $("#id_doSearch").change(runSearch);
 
+    // editing a search string while filtering is on updates the list; Enter turns filtering on
+    $("#id_searchString, #id_searchString2, #id_searchString3").on("change", function () {
+      if ($("#id_doSearch").prop("checked")) { runSearch(); }
+    }).on("keydown", function (event) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        $("#id_doSearch").prop("checked", true);
+        runSearch();
+      }
     });
 
     {% comment %} $("#id_searchString").change(function () {

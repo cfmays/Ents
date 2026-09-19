@@ -9,8 +9,15 @@ from .settings import MEDIA_URL
 from zoo.permissions import supervisor_required
 
 
+def count_text(n):
+    return f'{n} item' if n == 1 else f'{n} items'
+
+
 def index(request):
     form = enrichment_items_form()
+    count = Enrichment.objects.count()
+    form.fields['items'].label = f'Select Item ({count_text(count)})'
+    form.fields['items'].empty_label = f'--------- ({count_text(count)})'
     return render(request, 'index.html', {'form': form})
 
 
@@ -43,21 +50,18 @@ def logout_view(request):
 
     
 def ajax_load_searchstring_items(request):
-    #print (request)
-    #import ipdb; ipdb.set_trace()
-    
-    theSearchString=request.GET.get('theSearchString')
-    theDoSearch=request.GET.get('theDoSearch')
-    #print('theDoSearch; ' + theDoSearch)
-    #print('theSearchString: ' + theSearchString)
-    if (theDoSearch == 'true'):
-        theItems = Enrichment.objects.filter(name__icontains=theSearchString)
-    else:
-        theItems = Enrichment.objects.all()
-    #print('theItems: ')
-    #print(theItems)
-    return render(request, 'items_dropdown_list_options.html', {'theItems': theItems})
-    
+    theItems = Enrichment.objects.all()
+    if request.GET.get('theDoSearch') == 'true':
+        # every non-blank search string (up to three) must appear in the name
+        for key in ('theSearchString', 'theSearchString2', 'theSearchString3'):
+            text = request.GET.get(key, '').strip()
+            if text:
+                theItems = theItems.filter(name__icontains=text)
+    return render(request, 'items_dropdown_list_options.html', {
+        'theItems': theItems,
+        'count_text': count_text(theItems.count()),
+    })
+
 def ajax_get_image_url(request):
     theItemID = request.GET.get('theItem')
     if not theItemID:

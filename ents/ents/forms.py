@@ -27,5 +27,7 @@ class EnrichmentSelect(forms.Select):
 class enrichment_items_form(Form):
 
     searchString = forms.CharField(label = 'Enter search text', required=False)
+    searchString2 = forms.CharField(label = 'and also (optional)', required=False)
+    searchString3 = forms.CharField(label = 'and also (optional)', required=False)
     doSearch = forms.BooleanField(label = 'Check to filter, uncheck to reset')
     items = forms.ModelChoiceField(label = 'Select Item',queryset=Enrichment.objects.all(), required=False, widget=EnrichmentSelect)
