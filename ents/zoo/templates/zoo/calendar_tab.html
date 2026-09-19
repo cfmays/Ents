@@ -42,7 +42,7 @@
 </div>
 <p class="mt-2">
   <a href="{% url 'zoo:list_management_tab' asg.id %}">List management</a> |
-  <a href="{% url 'zoo:reporting_view' asg.id %}">Reporting (historical)</a>
+  <a href="{% url 'zoo:reporting_view' asg.id %}">History</a>
 </p>
 
 {% if asg.special_concerns.all %}

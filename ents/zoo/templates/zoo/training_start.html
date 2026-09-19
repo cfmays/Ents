@@ -17,6 +17,7 @@
 </div>
 
 <button id="continue-btn" class="btn btn-primary mt-2" disabled>Continue</button>
+<button id="history-btn" class="btn btn-outline-secondary mt-2" disabled>History</button>
 
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
 <script>
@@ -39,10 +40,19 @@
   });
 
   $("#id_animal").on('change', function () {
-    $("#continue-btn").prop('disabled', !$(this).val());
+    $("#continue-btn, #history-btn").prop('disabled', !$(this).val());
   });
 
   var trainingEntryUrlTemplate = "{% url 'zoo:training_entry' 0 %}";
+
+  var historyUrlTemplate = "{% url 'zoo:training_history' 0 %}";
+
+  $("#history-btn").click(function () {
+    var animalId = $("#id_animal").val();
+    if (animalId) {
+      window.location.href = historyUrlTemplate.replace('/0/', '/' + animalId + '/');
+    }
+  });
 
   $("#continue-btn").click(function () {
     var animalId = $("#id_animal").val();

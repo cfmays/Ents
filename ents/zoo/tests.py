@@ -68,6 +68,23 @@ class TrainingFlowTests(TestCase):
         self.assertContains(response, 'Target')
         self.assertContains(response, 'Crate')
 
+    def test_training_history_lists_sessions_for_accessible_animals_only(self):
+        self.client.post(reverse('zoo:training_entry', args=[self.animal.id]), {'date': '2026-09-15'})  # not logged in: ignored
+        self.client.force_login(self.keeper)
+        self.client.post(reverse('zoo:training_entry', args=[self.animal.id]), {
+            'date': '2026-09-15', 'reinforcer_1': self.reinforcer.id, 'comments': 'Good session',
+            f'behavior_{self.maintenance_behavior.id}': '4',
+        })
+        page = self.client.get(reverse('zoo:training_history', args=[self.animal.id]))
+        self.assertContains(page, 'Good session')
+        self.assertContains(page, 'Target: 4')
+        self.assertContains(page, 'Grapes')
+        self.assertContains(self.client.get(reverse('zoo:training_entry', args=[self.animal.id])), 'History')
+
+        other = User.objects.create_user('other', password='pw')
+        self.client.force_login(other)
+        self.assertEqual(self.client.get(reverse('zoo:training_history', args=[self.animal.id])).status_code, 403)
+
     def test_submitting_training_session_creates_behavior_scores(self):
         self.client.force_login(self.keeper)
         response = self.client.post(reverse('zoo:training_entry', args=[self.animal.id]), {

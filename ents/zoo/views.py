@@ -355,6 +355,16 @@ def training_ajax_animals_for_string(request):
 
 
 @login_required
+def training_history(request, animal_id):
+    animal = _get_accessible_training_animal(request, animal_id)
+    sessions = animal.training_sessions.select_related('trainer', 'reinforcer_1', 'reinforcer_2', 'reinforcer_3').prefetch_related(
+        'behavior_scores__behavior',
+    )
+    page_obj = Paginator(sessions, 50).get_page(request.GET.get('page'))
+    return render(request, 'zoo/training_history.html', {'animal': animal, 'page_obj': page_obj})
+
+
+@login_required
 def training_entry(request, animal_id):
     animal = _get_accessible_training_animal(request, animal_id)
     profile, _ = Profile.objects.get_or_create(user=request.user)

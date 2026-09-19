@@ -240,6 +240,10 @@ class TrainingSession(models.Model):
     def __str__(self):
         return f"{self.animal} {self.date} ({self.trainer})"
 
+    def reinforcers(self):
+        """The reinforcers tried, in order."""
+        return [r for r in (self.reinforcer_1, self.reinforcer_2, self.reinforcer_3) if r]
+
 
 class BehaviorScore(models.Model):
     session = models.ForeignKey(TrainingSession, on_delete=models.CASCADE, related_name='behavior_scores')

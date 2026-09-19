@@ -2,7 +2,7 @@
 
 {% block content %}
 <h1>{{ animal.name }}</h1>
-<p class="text-muted">{{ animal.string.name }} String</p>
+<p class="text-muted">{{ animal.string.name }} String &middot; <a href="{% url 'zoo:training_history' animal.id %}">History</a></p>
 
 <form method="post">
   {% csrf_token %}

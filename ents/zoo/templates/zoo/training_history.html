@@ -1,0 +1,53 @@
+{% extends "base_generic.html" %}
+
+{% block content %}
+<h1>{{ animal.name }} &mdash; History</h1>
+<p><a href="{% url 'zoo:training_entry' animal.id %}">Back to training log</a></p>
+
+<table class="table table-sm">
+  <thead>
+    <tr>
+      <th>Date</th>
+      <th>Trainer</th>
+      <th>Minutes</th>
+      <th>Overall</th>
+      <th>Aggression</th>
+      <th>Appetite</th>
+      <th>Reinforcers</th>
+      <th>Behavior scores</th>
+      <th>Comments</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for session in page_obj %}
+    <tr>
+      <td>{{ session.date }}</td>
+      <td>{{ session.trainer.username|capfirst|default:"" }}</td>
+      <td>{{ session.session_length_minutes|default_if_none:"" }}</td>
+      <td>{{ session.overall_rating|default_if_none:"" }}</td>
+      <td>{{ session.aggression_level|default_if_none:"" }}</td>
+      <td>{{ session.appetite_level|default_if_none:"" }}</td>
+      <td>{% for r in session.reinforcers %}{{ r }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
+      <td>{% for score in session.behavior_scores.all %}{{ score.behavior.name }}: {{ score.score }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</td>
+      <td>{{ session.comments }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="9"><em>No training sessions logged yet.</em></td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% if page_obj.has_other_pages %}
+<nav>
+  <ul class="pagination">
+    {% if page_obj.has_previous %}
+    <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a></li>
+    {% endif %}
+    <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+    {% if page_obj.has_next %}
+    <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a></li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}
+{% endblock %}
