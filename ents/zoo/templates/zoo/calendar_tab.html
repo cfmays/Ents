@@ -57,7 +57,8 @@
 {% endif %}
 
 
-<form method="post">
+<div id="copy-message"></div>
+<form method="post" id="calendar-form">
   {% csrf_token %}
   {{ formset.management_form }}
   <table class="table table-sm">
@@ -106,12 +107,11 @@
   <button type="button" id="add-row-btn" class="btn btn-outline-secondary calendar-btn">+ Add row</button>
   <button type="submit" class="btn btn-primary calendar-btn">Save calendar</button>
   <span style="float:right">
-    {% if clipboard %}<span class="text-muted small mr-2" style="margin-right:8px">Copied: {{ clipboard }}</span>{% endif %}
-    <button type="submit" form="copy-form" class="btn btn-outline-secondary calendar-btn">Copy</button>
+    <span id="clipboard-note" class="text-muted small" style="margin-right:8px">{% if clipboard %}Copied: {{ clipboard }}{% endif %}</span>
+    <button type="button" id="copy-btn" class="btn btn-outline-secondary calendar-btn">Copy</button>
     <button type="submit" form="paste-form" class="btn btn-outline-secondary calendar-btn">Paste</button>
   </span>
 </form>
-<form id="copy-form" method="post" action="{% url 'zoo:calendar_copy' asg.id year month %}">{% csrf_token %}</form>
 <form id="paste-form" method="post" action="{% url 'zoo:calendar_paste' asg.id year month %}">{% csrf_token %}</form>
 
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
@@ -196,6 +196,28 @@
 
   $("#add-row-btn").click(function () {
     addRow();
+  });
+
+  // Copy runs in the background so nothing on the page is lost or reloaded
+  $("#copy-btn").click(function () {
+    $.ajax({
+      url: "{% url 'zoo:calendar_copy' asg.id year month %}",
+      method: "POST",
+      data: $("#calendar-form").serialize(),
+      success: function (reply) {
+        var $box = $("#copy-message").empty();
+        var $alert = $('<div class="alert" role="alert"></div>').addClass("alert-" + reply.level).text(reply.message);
+        if (reply.level === "success") {
+          $alert.prepend("<strong>Success</strong> ");
+          $("#clipboard-note").text("Copied: " + reply.clipboard);
+          setTimeout(function () { $alert.remove(); }, 3000);
+        }
+        $box.append($alert);
+      },
+      error: function () {
+        $("#copy-message").html('<div class="alert alert-danger">Copy failed. Please try again.</div>');
+      }
+    });
   });
 
   // a row's error message goes away as soon as the keeper touches that row

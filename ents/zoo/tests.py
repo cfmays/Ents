@@ -196,7 +196,7 @@ class KeeperAccessScopingTests(TestCase):
         ASGApprovedItem.objects.filter(asg=self.asg, item=gone).delete()
 
         self.client.force_login(self.assigned_keeper)
-        self.client.post(reverse('zoo:calendar_copy', args=[self.asg.id, 2026, 8]))
+        self.client.post(reverse('zoo:calendar_copy', args=[self.asg.id, 2026, 8]))  # no form data: copies saved entries
         response = self.client.post(reverse('zoo:calendar_paste', args=[self.asg.id, 2026, 9]), follow=True)
 
         september = CalendarEntry.objects.filter(date__year=2026, date__month=9)
@@ -211,6 +211,26 @@ class KeeperAccessScopingTests(TestCase):
         response = self.client.post(reverse('zoo:calendar_paste', args=[self.asg.id, 2026, 9]), follow=True)
         self.assertEqual(september.count(), 1)  # pasting twice doesn't duplicate
         self.assertContains(response, 'already in this month')
+
+    def test_copy_uses_unsaved_rows_on_the_page(self):
+        item = Enrichment.objects.create(name='Ball', photo=make_image_file(name='ball.png'))
+        ASGApprovedItem.objects.create(asg=self.asg, item=item)
+        self.client.force_login(self.assigned_keeper)
+        url = reverse('zoo:calendar_copy', args=[self.asg.id, 2026, 8])
+        data = {
+            'form-TOTAL_FORMS': '2', 'form-INITIAL_FORMS': '0', 'form-MIN_NUM_FORMS': '0', 'form-MAX_NUM_FORMS': '1000',
+            'form-0-date': '2026-08-05', 'form-0-item': str(item.id),
+            'form-1-date': '', 'form-1-item': '',
+        }
+        reply = self.client.post(url, data).json()
+        self.assertEqual(reply['level'], 'success')
+        self.assertEqual(self.client.session['calendar_clipboard']['entries'][0]['day'], 5)
+        self.assertFalse(CalendarEntry.objects.exists())  # copying saves nothing
+
+        data['form-1-notes'] = 'no date or item'
+        reply = self.client.post(url, data).json()
+        self.assertEqual(reply['level'], 'warning')
+        self.assertIn('Please enter a date.', reply['message'])
 
     def test_paste_without_copy_or_from_another_calendar_is_refused(self):
         self.client.force_login(self.assigned_keeper)

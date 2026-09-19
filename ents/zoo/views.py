@@ -103,20 +103,40 @@ def _month_label(year, month):
 @login_required
 @require_POST
 def calendar_copy(request, asg_id, year, month):
+    """Copy what's on the calendar page (saved or not) without reloading it; replies with JSON."""
     asg = _get_accessible_asg(request, asg_id)
-    entries = CalendarEntry.objects.filter(asg=asg, date__year=year, date__month=month)
-    if not entries:
-        messages.warning(request, f'Nothing to copy: there are no saved entries in {_month_label(year, month)}.')
+    if 'form-TOTAL_FORMS' in request.POST:
+        queryset = CalendarEntry.objects.filter(asg=asg, date__year=year, date__month=month)
+        formset = make_calendar_entry_formset(asg)(request.POST, queryset=queryset)
+        if not formset.is_valid():
+            problems = []
+            for form in formset.forms:
+                for errors in form.errors.values():
+                    problems += [e for e in errors if e not in problems]
+            return JsonResponse({'level': 'warning', 'message': "Can't copy yet. " + ' '.join(problems)})
+        rows = [
+            (f.cleaned_data['date'], f.cleaned_data.get('animal'), f.cleaned_data['item'], f.cleaned_data.get('behavior_goal'))
+            for f in formset.forms
+            if f.cleaned_data.get('date') and f.cleaned_data.get('item')
+            and (f.cleaned_data['date'].year, f.cleaned_data['date'].month) == (year, month)
+        ]
     else:
-        request.session['calendar_clipboard'] = {
-            'asg_id': asg.id, 'year': year, 'month': month,
-            'entries': [
-                {'day': e.date.day, 'animal': e.animal_id, 'item': e.item_id, 'goal': e.behavior_goal_id}
-                for e in entries
-            ],
-        }
-        messages.success(request, f'Copied {_entries(len(entries))} from {_month_label(year, month)}.')
-    return redirect('zoo:calendar_tab', asg_id=asg.id, year=year, month=month)
+        rows = [
+            (e.date, e.animal, e.item, e.behavior_goal)
+            for e in CalendarEntry.objects.filter(asg=asg, date__year=year, date__month=month)
+        ]
+
+    if not rows:
+        return JsonResponse({'level': 'warning', 'message': f'Nothing to copy: no entries in {_month_label(year, month)}.'})
+    request.session['calendar_clipboard'] = {
+        'asg_id': asg.id, 'year': year, 'month': month,
+        'entries': [
+            {'day': d.day, 'animal': animal.id if animal else None, 'item': item.id, 'goal': goal.id if goal else None}
+            for d, animal, item, goal in rows
+        ],
+    }
+    what = f'{_entries(len(rows))} from {_month_label(year, month)}'
+    return JsonResponse({'level': 'success', 'message': f'Copied {what}.', 'clipboard': what})
 
 
 @login_required
