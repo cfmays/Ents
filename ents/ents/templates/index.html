@@ -4,6 +4,13 @@
 
 {% comment %} <p>exportform.html</p> {% endcomment %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css">
+<style>
+  /* keep dropdown rows and the closed box tall enough for the 56px thumbnails */
+  .select2-results__option { min-height: 60px; display: flex; align-items: center; }
+  .select2-selection--single { height: 60px !important; }
+  .select2-selection--single .select2-selection__rendered { line-height: 60px !important; display: flex; align-items: center; }
+  .select2-selection--single .select2-selection__arrow { height: 60px !important; }
+</style>
 <form action="{% url 'index' %}" method="post">
     {% csrf_token %}
     <h1> Enrichment Items</h1>

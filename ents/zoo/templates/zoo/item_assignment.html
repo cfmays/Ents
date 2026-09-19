@@ -1,0 +1,46 @@
+{% extends "base_generic.html" %}
+
+{% block content %}
+<h1>Item &harr; Calendar Assignments</h1>
+
+<h4>Look up an item's calendars</h4>
+<select id="lookup-item" class="form-control" style="max-width:400px;">
+  <option value="">Choose an item&hellip;</option>
+  {% for item in form.fields.items.queryset %}
+  <option value="{{ item.id }}">{{ item.name }}</option>
+  {% endfor %}
+</select>
+<ul id="lookup-result" class="mt-2"></ul>
+
+<hr>
+
+<h4>Assign item(s) to calendar(s)</h4>
+<form method="post">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button type="submit" class="btn btn-primary">Assign</button>
+</form>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script>
+  $("#lookup-item").change(function () {
+    var itemId = $(this).val();
+    var resultEl = $("#lookup-result");
+    resultEl.empty();
+    if (!itemId) { return; }
+    $.ajax({
+      url: "{% url 'zoo:item_ajax_asgs_for_item' %}",
+      data: {'item_id': itemId},
+      success: function (data) {
+        if (!data.asgs.length) {
+          resultEl.append("<li><em>Not assigned to any calendar yet.</em></li>");
+          return;
+        }
+        data.asgs.forEach(function (name) {
+          resultEl.append("<li>" + name + "</li>");
+        });
+      }
+    });
+  });
+</script>
+{% endblock %}

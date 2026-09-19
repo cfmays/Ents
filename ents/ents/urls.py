@@ -14,7 +14,7 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path
+from django.urls import include, path
 from . import views
 from django.contrib.auth import views as auth_views
 from django.conf.urls.static import static
@@ -33,5 +33,6 @@ urlpatterns = [
     path('login/', auth_views.LoginView.as_view(), name='login'),
     path('ajax_get_image_url', views.ajax_get_image_url, name='ajax_get_image_url'),
     path('ajax_load_searchstring_items', views.ajax_load_searchstring_items, name='ajax_load_searchstring_items'),
-    
+    path('zoo/', include('zoo.urls')),
+
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

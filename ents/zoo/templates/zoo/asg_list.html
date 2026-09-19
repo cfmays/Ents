@@ -1,0 +1,25 @@
+{% extends "base_generic.html" %}
+
+{% block content %}
+<h1>Enrichment Calendars</h1>
+<p><a href="{% url 'zoo:training_start' %}">Go to Training Log</a></p>
+
+{% for string in strings %}
+<h4>{{ string.name }}</h4>
+<ul>
+  {% for asg in string.asgs.all %}
+  <li>
+    {{ asg.name }}
+    &mdash;
+    <a href="{% url 'zoo:calendar_tab' asg.id %}">Calendar</a> |
+    <a href="{% url 'zoo:list_management_tab' asg.id %}">List management</a> |
+    <a href="{% url 'zoo:reporting_view' asg.id %}">Reporting</a>
+  </li>
+  {% empty %}
+  <li><em>No calendars yet</em></li>
+  {% endfor %}
+</ul>
+{% empty %}
+<p><em>No strings set up yet. Ask a supervisor to add one in the admin panel.</em></p>
+{% endfor %}
+{% endblock %}

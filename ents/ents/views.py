@@ -2,11 +2,11 @@ from django.http.response import JsonResponse
 from django.shortcuts import render
 from .models import Enrichment
 from django.contrib.auth import logout
-from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseRedirect
 from django.urls import reverse
 from .forms import CreateEnrichmentForm, enrichment_items_form
 from .settings import MEDIA_URL
+from zoo.permissions import supervisor_required
 
 
 def index(request):
@@ -15,7 +15,7 @@ def index(request):
 
 
 
-@login_required
+@supervisor_required
 def EnrichmentUploadView(request):
     if request.method == 'POST':
         #print('in POST')

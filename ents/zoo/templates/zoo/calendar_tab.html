@@ -1,0 +1,215 @@
+{% extends "base_generic.html" %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css">
+<style>
+  /* item dropdown: keep the closed box and open rows tall enough for the 50px thumbnails */
+  .item-select2-dropdown .select2-results__option { min-height: 56px; display: flex; align-items: center; white-space: normal; }
+  .item-select2-dropdown { width: 600px !important; }
+  .item-label { min-width: 0; overflow-wrap: anywhere; }
+  .item-select2 .select2-selection--single { height: auto !important; min-height: 56px; }
+  .item-select2 .select2-selection--single .select2-selection__rendered {
+    line-height: 1.2 !important; min-height: 54px; padding: 4px 20px 4px 8px; white-space: normal; overflow: visible; font-size: 13px;
+    display: flex; align-items: center;
+  }
+  .item-select2 .select2-selection--single .select2-selection__arrow { height: 56px !important; }
+
+  .goal-select2-dropdown { width: 400px !important; }
+  .goal-select2-dropdown .select2-results__option { white-space: normal; }
+  select[name$="behavior_goal"] { width: 280px; }
+  input[name$="-date"] { width: 151px; }
+
+  /* Add row / Save calendar: same compact height */
+  .calendar-btn { padding: 0.1rem 0.6rem; font-size: 0.875rem; line-height: 1.3; }
+
+  /* DO/IO/GBS dropdowns: narrow closed box showing just the code, full text once opened */
+  .score-select2 { width: 42px !important; }
+  .score-select2 .select2-selection__arrow { display: none; }
+  .score-select2 .select2-selection--single .select2-selection__rendered {
+    padding: 0 4px;
+    text-overflow: clip;
+    overflow: visible;
+  }
+</style>
+
+<div style="display:flex; align-items:center; flex-wrap:wrap; gap:12px;">
+  <h1 class="mb-0">{{ asg.name }} &mdash; {{ month_name }}</h1>
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'zoo:calendar_tab' asg.id prev_year prev_month %}">&laquo; Previous month</a>
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'zoo:calendar_tab' asg.id next_year next_month %}">Next month &raquo;</a>
+</div>
+<p class="mt-2">
+  <a href="{% url 'zoo:list_management_tab' asg.id %}">List management</a> |
+  <a href="{% url 'zoo:reporting_view' asg.id %}">Reporting (historical)</a>
+</p>
+
+{% if asg.special_concerns.all %}
+<div class="alert alert-danger">
+  <ul class="mb-0">
+    {% for concern in asg.special_concerns.all %}
+    <li><strong>{{ concern.text }}</strong></li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{% if asg.notes %}
+<p><strong>Notes:</strong> {{ asg.notes }}</p>
+{% endif %}
+
+
+<form method="post">
+  {% csrf_token %}
+  {{ formset.management_form }}
+  <table class="table table-sm">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Animal</th>
+        <th>Enrichment item</th>
+        <th>Behavior goal</th>
+        <th>DO</th>
+        <th>IO</th>
+        <th>GBS</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for form in formset %}
+      <tr>
+        {{ form.id }}
+        <td>{{ form.date }}</td>
+        <td>{{ form.animal }}</td>
+        <td>{{ form.item }}</td>
+        <td>{{ form.behavior_goal }}</td>
+        <td>{{ form.do_score }}</td>
+        <td>{{ form.io_score }}</td>
+        <td>{{ form.gbs_score }}</td>
+        <td>{{ form.notes }}</td>
+      </tr>
+      {% if form.errors %}
+      <tr class="row-error"><td colspan="8" class="text-danger py-0"><strong>{% for errs in form.errors.values %}{{ errs|join:" " }} {% endfor %}</strong></td></tr>
+      {% endif %}
+      {% endfor %}
+      <tr id="empty-form-row" style="display:none">
+        {{ formset.empty_form.id }}
+        <td>{{ formset.empty_form.date }}</td>
+        <td>{{ formset.empty_form.animal }}</td>
+        <td>{{ formset.empty_form.item }}</td>
+        <td>{{ formset.empty_form.behavior_goal }}</td>
+        <td>{{ formset.empty_form.do_score }}</td>
+        <td>{{ formset.empty_form.io_score }}</td>
+        <td>{{ formset.empty_form.gbs_score }}</td>
+        <td>{{ formset.empty_form.notes }}</td>
+      </tr>
+    </tbody>
+  </table>
+  <button type="button" id="add-row-btn" class="btn btn-outline-secondary calendar-btn">+ Add row</button>
+  <button type="submit" class="btn btn-primary calendar-btn">Save calendar</button>
+  <span style="float:right">
+    {% if clipboard %}<span class="text-muted small mr-2" style="margin-right:8px">Copied: {{ clipboard }}</span>{% endif %}
+    <button type="submit" form="copy-form" class="btn btn-outline-secondary calendar-btn">Copy</button>
+    <button type="submit" form="paste-form" class="btn btn-outline-secondary calendar-btn">Paste</button>
+  </span>
+</form>
+<form id="copy-form" method="post" action="{% url 'zoo:calendar_copy' asg.id year month %}">{% csrf_token %}</form>
+<form id="paste-form" method="post" action="{% url 'zoo:calendar_paste' asg.id year month %}">{% csrf_token %}</form>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+  function formatItemWithThumb(item) {
+    if (!item.id) { return item.text; }
+    var thumbUrl = $(item.element).data("thumb");
+    if (!thumbUrl) { return item.text; }
+    return $(
+      '<span style="display:flex;align-items:center;">' +
+      '<img src="' + thumbUrl + '" style="height:50px;width:50px;flex-shrink:0;object-fit:cover;border-radius:4px;margin-right:8px;">' +
+      '<span class="item-label"></span></span>'
+    ).find(".item-label").text(item.text).end();
+  }
+
+  // containerCssClass/dropdownCssClass don't reliably attach in this select2 build,
+  // so add the sizing classes ourselves via select2's own data API instead.
+  function initItemSelect2($selects) {
+    $selects.select2({
+      width: "350px",
+      dropdownAutoWidth: true,
+      templateResult: formatItemWithThumb,
+      templateSelection: formatItemWithThumb
+    }).each(function () {
+      $(this).data("select2").$container.addClass("item-select2");
+    }).on("select2:open", function () {
+      $(this).data("select2").$dropdown.addClass("item-select2-dropdown");
+    });
+  }
+
+  // behavior goal: same look as the item dropdown (tall box, wrapping text), but narrower
+  function initGoalSelect2($selects) {
+    $selects.select2({
+      width: "280px",
+      dropdownAutoWidth: true
+    }).each(function () {
+      $(this).data("select2").$container.addClass("item-select2");
+    }).on("select2:open", function () {
+      $(this).data("select2").$dropdown.addClass("goal-select2-dropdown");
+    });
+  }
+
+  // DO/IO/GBS: show only the code (eg "0", "3", "G") when closed, the full label once the dropdown is open
+  function formatCodeOnly(item) {
+    return item.id ? item.id : "—";
+  }
+  function formatFullLabel(item) {
+    return item.text;
+  }
+  function initScoreSelect2($selects) {
+    $selects.select2({
+      width: "42px",
+      dropdownAutoWidth: true,
+      minimumResultsForSearch: Infinity,
+      templateResult: formatFullLabel,
+      templateSelection: formatCodeOnly
+    }).each(function () {
+      $(this).data("select2").$container.addClass("score-select2");
+    }).on("select2:open", function () {
+      $(this).data("select2").$dropdown.addClass("score-select2-dropdown");
+    });
+  }
+
+  // the hidden template row must stay plain <select>s so cloning it doesn't drag along a select2 container
+  initItemSelect2($(".item-select").not("#empty-form-row .item-select"));
+  initScoreSelect2($(".score-select").not("#empty-form-row .score-select"));
+  initGoalSelect2($('select[name$="behavior_goal"]').not("#empty-form-row select"));
+
+  function addRow() {
+    var totalForms = $("#id_form-TOTAL_FORMS");
+    var newIndex = parseInt(totalForms.val(), 10);
+    var newRowHtml = $("#empty-form-row").html().split(/__prefix__/g).join(newIndex);
+    var $newRow = $("<tr>" + newRowHtml + "</tr>");
+    $newRow.insertBefore("#empty-form-row");
+    initItemSelect2($newRow.find(".item-select"));
+    initScoreSelect2($newRow.find(".score-select"));
+    initGoalSelect2($newRow.find('select[name$="behavior_goal"]'));
+    totalForms.val(newIndex + 1);
+    return $newRow;
+  }
+
+  $("#add-row-btn").click(function () {
+    addRow();
+  });
+
+  // a row's error message goes away as soon as the keeper touches that row
+  $("table tbody").on("focusin click input change", "tr", function () {
+    $(this).next("tr.row-error").remove();
+  });
+
+  // also add a fresh blank row automatically once the keeper starts editing the last one
+  $("table tbody").on("change input", "input, select, textarea", function () {
+    var $row = $(this).closest("tr");
+    if ($row.attr("id") === "empty-form-row") { return; }
+    if ($row.next("tr").is("#empty-form-row")) {
+      addRow();
+    }
+  });
+</script>
+{% endblock %}

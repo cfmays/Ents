@@ -1,0 +1,66 @@
+{% extends "base_generic.html" %}
+
+{% block content %}
+<h1>{{ animal.name }}</h1>
+<p class="text-muted">{{ animal.string.name }} String</p>
+
+<form method="post">
+  {% csrf_token %}
+
+  <div class="form-group">{{ form.date.label_tag }} {{ form.date }}</div>
+  <div class="form-group">{{ form.session_length_minutes.label_tag }} {{ form.session_length_minutes }}</div>
+  <div class="form-group">{{ form.overall_rating.label_tag }} {{ form.overall_rating }}</div>
+  <div class="form-group">{{ form.aggression_level.label_tag }} {{ form.aggression_level }}</div>
+  <div class="form-group">{{ form.appetite_level.label_tag }} {{ form.appetite_level }}</div>
+
+  <h4>Reinforcers</h4>
+  <div class="form-group">{{ form.reinforcer_1.label_tag }} {{ form.reinforcer_1 }}</div>
+  <div class="form-group" id="reinforcer-2-group" {% if not form.reinforcer_1.value %}style="display:none"{% endif %}>
+    {{ form.reinforcer_2.label_tag }} {{ form.reinforcer_2 }}
+  </div>
+  <div class="form-group" id="reinforcer-3-group" {% if not form.reinforcer_2.value %}style="display:none"{% endif %}>
+    {{ form.reinforcer_3.label_tag }} {{ form.reinforcer_3 }}
+  </div>
+
+  <h4 class="mt-3">Maintenance Behaviors</h4>
+  <ol>
+    <li>Refused to participate, refused behavior repetitively;</li>
+    <li>Some participation but refused most, left early;</li>
+    <li>Some participation but refused some</li>
+    <li>Participated fully</li>
+    <li>Exceptional -  participated fully and seemed eager to continue</li>
+  </ol>
+  {% for field in form.maintenance_bound_fields %}
+  <div class="form-group">{{ field.label_tag }} {{ field }}</div>
+  {% empty %}
+  <p><em>No maintenance behaviors assigned to this animal yet.</em></p>
+  {% endfor %}
+
+  <h4 class="mt-3">New Behaviors</h4>
+  <ol>
+    <li>Refused to participate, refused behavior repetitively;</li>
+    <li>Some participation but refused some, left early;</li>
+    <li>Participated fully as expected, no progress made on new behavior;</li>
+    <li>Participated fully, made progress in training new behaviors;</li>
+    <li>Exceptional - did everything great, made great progress on new behaviors, significantly better than normal.</li>
+  </ol>
+  {% for field in form.new_behavior_bound_fields %}
+  <div class="form-group">{{ field.label_tag }} {{ field }}</div>
+  {% empty %}
+  <p><em>No new behaviors assigned to this animal yet.</em></p>
+  {% endfor %}
+
+  <div class="form-group mt-3">{{ form.comments.label_tag }} {{ form.comments }}</div>
+
+  <button type="submit" class="btn btn-primary">Submit training session</button>
+</form>
+
+<script>
+  $("#id_reinforcer_1").change(function () {
+    if ($(this).val()) { $("#reinforcer-2-group").show(); }
+  });
+  $("#id_reinforcer_2").change(function () {
+    if ($(this).val()) { $("#reinforcer-3-group").show(); }
+  });
+</script>
+{% endblock %}

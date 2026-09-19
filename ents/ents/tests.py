@@ -4,7 +4,7 @@ import tempfile
 
 from PIL import Image
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -63,6 +63,12 @@ class EnrichmentModelTests(TestCase):
         img = Image.open(e.photo.path)
         self.assertEqual(img.size, (100, 100))
 
+    def test_can_create_without_a_photo(self):
+        # master-list items get preloaded by name/category before anyone has
+        # uploaded a real photo for them; saving must not crash.
+        e = Enrichment.objects.create(name='No Photo Yet')
+        self.assertFalse(e.photo)
+
 
 class IndexViewTests(TestCase):
 
@@ -77,12 +83,43 @@ class EnrichmentUploadViewTests(TestCase):
 
     def setUp(self):
         self.user = User.objects.create_user(username='alice', password='password123')
+        supervisor_group, _ = Group.objects.get_or_create(name='Supervisor')
+        self.user.groups.add(supervisor_group)
         self.url = reverse('createView')
 
     def test_get_requires_login(self):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 302)
         self.assertIn(reverse('login'), response.url)
+
+    def test_get_forbidden_for_logged_in_non_supervisor(self):
+        User.objects.create_user(username='bob', password='password123')
+        self.client.login(username='bob', password='password123')
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_allowed_for_superuser_without_supervisor_group(self):
+        User.objects.create_superuser(username='root', email='root@example.com', password='password123')
+        self.client.login(username='root', password='password123')
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_nav_hides_new_item_link_for_non_supervisor(self):
+        User.objects.create_user(username='carol', password='password123')
+        self.client.login(username='carol', password='password123')
+        response = self.client.get(reverse('index'))
+        self.assertNotContains(response, 'New Item')
+
+    def test_nav_shows_new_item_link_for_supervisor(self):
+        self.client.login(username='alice', password='password123')
+        response = self.client.get(reverse('index'))
+        self.assertContains(response, 'New Item')
+
+    def test_nav_shows_new_item_link_for_superuser(self):
+        User.objects.create_superuser(username='root2', email='root2@example.com', password='password123')
+        self.client.login(username='root2', password='password123')
+        response = self.client.get(reverse('index'))
+        self.assertContains(response, 'New Item')
 
     def test_get_renders_form_when_logged_in(self):
         self.client.login(username='alice', password='password123')
@@ -167,3 +204,18 @@ class AjaxGetImageUrlTests(TestCase):
         data = response.json()
         self.assertIn('/media/', data['theURL'])
         self.assertIn('ball', data['theURL'])
+
+
+class CaseInsensitiveLoginTests(TestCase):
+
+    def setUp(self):
+        self.user = User.objects.create_user('maranda', password='1957')
+
+    def test_login_succeeds_with_different_case_username(self):
+        self.assertTrue(self.client.login(username='Maranda', password='1957'))
+
+    def test_login_succeeds_with_original_case_username(self):
+        self.assertTrue(self.client.login(username='maranda', password='1957'))
+
+    def test_login_fails_with_wrong_password(self):
+        self.assertFalse(self.client.login(username='MARANDA', password='wrong'))

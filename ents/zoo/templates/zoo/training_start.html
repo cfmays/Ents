@@ -1,0 +1,58 @@
+{% extends "base_generic.html" %}
+
+{% block content %}
+<h1>Training Log</h1>
+
+<div class="form-group">
+  <label for="id_string">String</label>
+  {{ form.string }}
+</div>
+
+<div class="form-group">
+  <label for="id_animal">Animal</label>
+  <select id="id_animal" class="form-control">
+    <option value="">---------</option>
+  </select>
+</div>
+
+<button id="continue-btn" class="btn btn-primary mt-2" disabled>Continue</button>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script>
+  function loadAnimalsForString(stringId) {
+    if (!stringId) {
+      $("#id_animal").html('<option value="">---------</option>');
+      return;
+    }
+    $.ajax({
+      url: "{% url 'zoo:training_ajax_animals_for_string' %}",
+      data: {'string_id': stringId},
+      success: function (data) {
+        $("#id_animal").html(data);
+      }
+    });
+  }
+
+  $("#id_string").change(function () {
+    loadAnimalsForString($(this).val());
+  });
+
+  $("#id_animal").on('change', function () {
+    $("#continue-btn").prop('disabled', !$(this).val());
+  });
+
+  var trainingEntryUrlTemplate = "{% url 'zoo:training_entry' 0 %}";
+
+  $("#continue-btn").click(function () {
+    var animalId = $("#id_animal").val();
+    if (animalId) {
+      window.location.href = trainingEntryUrlTemplate.replace('0', animalId);
+    }
+  });
+
+  $(document).ready(function () {
+    var initial = $("#id_string").val();
+    if (initial) { loadAnimalsForString(initial); }
+  });
+</script>
+{% endblock %}

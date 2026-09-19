@@ -1,0 +1,89 @@
+{% extends "base_generic.html" %}
+
+{% block content %}
+<h1>{{ asg.name }} &mdash; List Management</h1>
+<p>
+  <a href="{% url 'zoo:calendar_tab' asg.id %}">Calendar</a> |
+  <a href="{% url 'zoo:reporting_view' asg.id %}">Reporting (historical)</a>
+</p>
+
+<h4>Animals</h4>
+<ul>
+  {% for animal in asg.animals.all %}
+  <li>
+    <form method="post" class="d-inline">
+      {% csrf_token %}
+      {{ animal.name }}
+      <button type="submit" name="remove_animal" value="{{ animal.id }}" class="btn btn-link btn-sm text-danger">remove</button>
+    </form>
+  </li>
+  {% empty %}
+  <li><em>None</em></li>
+  {% endfor %}
+</ul>
+<form method="post" class="form-inline mb-3">
+  {% csrf_token %}
+  {{ animal_form.name }}
+  <button type="submit" class="btn btn-sm btn-secondary">Add animal</button>
+  {{ animal_form.name.errors }}
+</form>
+
+<h4>Special concerns</h4>
+<ul>
+  {% for concern in asg.special_concerns.all %}
+  <li>{{ concern.text }}</li>
+  {% empty %}
+  <li><em>None</em></li>
+  {% endfor %}
+</ul>
+
+<h4>Behavior goals</h4>
+<ul>
+  {% for goal in asg.behavior_goals.all %}
+  <li>{{ goal.name }}</li>
+  {% empty %}
+  <li><em>None</em></li>
+  {% endfor %}
+</ul>
+<form method="post" class="form-inline">
+  {% csrf_token %}
+  {{ form.behavior_goal }}
+  <button type="submit" class="btn btn-sm btn-secondary">Add goal</button>
+</form>
+
+<h4 class="mt-4">Approved non-food enrichment</h4>
+<div class="row">
+  {% for assignment in non_food_items %}
+  <div class="col-auto text-center mb-3">
+    {% if assignment.item.photo %}
+    <img src="{{ assignment.item.photo.url }}" style="height:50px;width:50px;object-fit:cover;border-radius:4px;">
+    {% else %}
+    <div style="height:50px;width:50px;background:#ddd;border-radius:4px;" class="mx-auto"></div>
+    {% endif %}
+    <div>{{ assignment.item.name }}</div>
+    {% if assignment.comments %}<div class="text-muted small">{{ assignment.comments }}</div>{% endif %}
+    {% if assignment.rate %}<div class="text-muted small">Rate: {{ assignment.rate }}</div>{% endif %}
+  </div>
+  {% empty %}
+  <p><em>None</em></p>
+  {% endfor %}
+</div>
+
+<h4>Approved food enrichment</h4>
+<div class="row">
+  {% for assignment in food_items %}
+  <div class="col-auto text-center mb-3">
+    {% if assignment.item.photo %}
+    <img src="{{ assignment.item.photo.url }}" style="height:50px;width:50px;object-fit:cover;border-radius:4px;">
+    {% else %}
+    <div style="height:50px;width:50px;background:#ddd;border-radius:4px;" class="mx-auto"></div>
+    {% endif %}
+    <div>{{ assignment.item.name }}</div>
+    {% if assignment.comments %}<div class="text-muted small">{{ assignment.comments }}</div>{% endif %}
+    {% if assignment.rate %}<div class="text-muted small">Rate: {{ assignment.rate }}</div>{% endif %}
+  </div>
+  {% empty %}
+  <p><em>None</em></p>
+  {% endfor %}
+</div>
+{% endblock %}

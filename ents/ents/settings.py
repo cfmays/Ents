@@ -81,6 +81,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'enrich',
     'ents',
+    'zoo',
 ]
 
 MIDDLEWARE = [
@@ -124,6 +125,8 @@ DATABASES = {
     }
 }
 
+
+AUTHENTICATION_BACKENDS = ['ents.auth_backends.CaseInsensitiveModelBackend']
 
 # Password validation
 # https://docs.djangoproject.com/en/3.2/ref/settings/#auth-password-validators
