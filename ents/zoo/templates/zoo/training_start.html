@@ -2,6 +2,7 @@
 
 {% block content %}
 <h1>Training Log</h1>
+{% if can_manage %}<p><a href="{% url 'zoo:manage_training' %}">Manage training logs</a></p>{% endif %}
 
 <div class="form-group">
   <label for="id_string">String</label>

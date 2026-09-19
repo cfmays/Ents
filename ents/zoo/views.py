@@ -6,7 +6,8 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.contrib.auth.models import User
+from django.db.models import Count, Prefetch, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -14,7 +15,7 @@ from django.views.decorators.http import require_POST
 
 from .forms import AddAnimalChoiceForm, AddBehaviorGoalForm, ItemAssignmentForm, TrainingSessionForm, TrainingStringForm, make_calendar_entry_formset
 from ents.models import Enrichment
-from .models import ASG, ASGApprovedItem, Animal, default_is_food, BehaviorGoal, BehaviorScore, CalendarEntry, Profile, SpecialConcern, String, TrainingAnimal, TrainingSession
+from .models import Division, Behavior, Reinforcer, ASG, ASGApprovedItem, Animal, default_is_food, BehaviorGoal, BehaviorScore, CalendarEntry, Profile, SpecialConcern, String, TrainingAnimal, TrainingSession
 from .permissions import is_supervisor, supervisor_required, user_can_access_asg, user_can_access_string, user_can_access_training_animal
 
 
@@ -316,7 +317,7 @@ def reporting_view(request, asg_id):
 def training_start(request):
     profile, _ = Profile.objects.get_or_create(user=request.user)
     form = TrainingStringForm(user=request.user, initial={'string': profile.last_training_string_id})
-    return render(request, 'zoo/training_start.html', {'form': form})
+    return render(request, 'zoo/training_start.html', {'form': form, 'can_manage': is_supervisor(request.user)})
 
 
 @login_required
@@ -390,3 +391,200 @@ def item_ajax_asgs_for_item(request):
     if not request.user.is_superuser:
         asgs = asgs.filter(string__division__in=request.user.profile.divisions.all())
     return JsonResponse({'asgs': [asg.name for asg in asgs]})
+
+
+# ---- Manage training logs (supervisors and superusers) ----
+
+def _clean(text):
+    return re.sub(r'\s+', ' ', text or '').strip()
+
+
+def _manageable_strings(user):
+    """Superusers manage every string; supervisors only those in their divisions."""
+    if user.is_superuser:
+        return String.objects.all()
+    profile = getattr(user, 'profile', None)
+    return String.objects.filter(division__in=profile.divisions.all()) if profile else String.objects.none()
+
+
+def _my_divisions(user):
+    if user.is_superuser:
+        return Division.objects.all()
+    profile = getattr(user, 'profile', None)
+    return profile.divisions.all() if profile else Division.objects.none()
+
+
+def _animal_for(strings, animal_id):
+    return get_object_or_404(TrainingAnimal, pk=animal_id, string__in=strings)
+
+
+def _add_string(request, strings):
+    name = _clean(request.POST.get('new_string'))
+    divisions = _my_divisions(request.user)
+    division = divisions.filter(pk=request.POST.get('new_string_division') or None).first()
+    if division is None and not request.user.is_superuser:
+        division = divisions.first() if divisions.count() == 1 else None
+        if division is None:
+            messages.warning(request, 'Choose one of your divisions for the new string.')
+            return
+    if not name:
+        messages.warning(request, 'Enter a name for the new string.')
+    elif String.objects.filter(name__iexact=name).exists():
+        messages.warning(request, f'A string named "{name}" already exists.')
+    else:
+        String.objects.create(name=name, division=division)
+        messages.success(request, f'Added string {name}.')
+
+
+def _rename_string(request, strings, string_id):
+    string = get_object_or_404(strings, pk=string_id)
+    name = _clean(request.POST.get(f'rename_{string.id}'))
+    if not name:
+        messages.warning(request, 'A string needs a name.')
+    elif String.objects.filter(name__iexact=name).exclude(pk=string.pk).exists():
+        messages.warning(request, f'A string named "{name}" already exists.')
+    else:
+        string.name = name
+        string.save()
+        messages.success(request, 'String renamed.')
+
+
+def _set_division(request, strings, string_id):
+    if not request.user.is_superuser:
+        raise PermissionDenied('Only superusers can change a string\'s division.')
+    string = get_object_or_404(strings, pk=string_id)
+    string.division = Division.objects.filter(pk=request.POST.get(f'division_{string.id}') or None).first()
+    string.save()
+    messages.success(request, f'{string.name} is now in {string.division or "no division"}.')
+
+
+def _delete_string(request, strings, string_id):
+    string = get_object_or_404(strings, pk=string_id)
+    if string.training_animals.exists() or string.asgs.exists():
+        messages.warning(request, f'{string.name} still has training animals or calendars; move or remove them first.')
+    else:
+        string.delete()
+        messages.success(request, f'Deleted string {string.name}.')
+
+
+def _add_keeper(request, strings, string_id):
+    string = get_object_or_404(strings, pk=string_id)
+    user = User.objects.filter(pk=request.POST.get(f'new_keeper_{string.id}') or None, is_superuser=False).first()
+    if user is None:
+        messages.warning(request, 'Choose a user to add.')
+    else:
+        string.keepers.add(user)
+        messages.success(request, f'{user.username.capitalize()} can now use {string.name}.')
+
+
+def _remove_keeper(request, strings, string_id, user_id):
+    string = get_object_or_404(strings, pk=string_id)
+    string.keepers.remove(*User.objects.filter(pk=user_id))
+    messages.success(request, 'Keeper removed.')
+
+
+def _add_animal(request, strings, string_id):
+    string = get_object_or_404(strings, pk=string_id)
+    name = _clean(request.POST.get(f'new_animal_{string.id}'))
+    if not name:
+        messages.warning(request, 'Enter a name for the animal.')
+    elif TrainingAnimal.objects.filter(name__iexact=name).exists():
+        messages.warning(request, f'A training animal named "{name}" already exists.')
+    else:
+        TrainingAnimal.objects.create(name=name, string=string)
+        messages.success(request, f'Added {name} to {string.name}.')
+
+
+def _delete_animal(request, strings, animal_id):
+    animal = _animal_for(strings, animal_id)
+    animal.delete()
+    messages.success(request, f'Deleted {animal.name} and its training sessions.')
+
+
+def _behavior_manager(animal, kind):
+    return animal.maintenance_behaviors if kind == 'maintenance' else animal.new_behaviors
+
+
+def _add_behavior(request, strings, animal_id, kind):
+    animal = _animal_for(strings, animal_id)
+    name = _clean(request.POST.get(f'new_behavior_{animal.id}_{kind}'))
+    if kind not in ('maintenance', 'new') or not name:
+        messages.warning(request, 'Enter a behavior.')
+        return
+    behavior = Behavior.objects.filter(behavior_type=kind, name__iexact=name).first() \
+        or Behavior.objects.create(behavior_type=kind, name=name)
+    _behavior_manager(animal, kind).add(behavior)
+    messages.success(request, f'Added {behavior.name} to {animal.name}.')
+
+
+def _remove_behavior(request, strings, animal_id, kind, behavior_id):
+    animal = _animal_for(strings, animal_id)
+    if kind in ('maintenance', 'new'):
+        _behavior_manager(animal, kind).remove(*Behavior.objects.filter(pk=behavior_id))
+        messages.success(request, 'Behavior removed.')
+
+
+def _move_behavior(request, strings, animal_id, behavior_id):
+    """New -> Maintenance for this animal (past scores stay on the New behavior they were logged against)."""
+    animal = _animal_for(strings, animal_id)
+    behavior = get_object_or_404(animal.new_behaviors, pk=behavior_id)
+    maintenance = Behavior.objects.filter(behavior_type='maintenance', name__iexact=behavior.name).first() \
+        or Behavior.objects.create(behavior_type='maintenance', name=behavior.name)
+    animal.new_behaviors.remove(behavior)
+    animal.maintenance_behaviors.add(maintenance)
+    messages.success(request, f'Moved {behavior.name} to maintenance behaviors for {animal.name}.')
+
+
+def _add_reinforcer(request, strings, animal_id):
+    animal = _animal_for(strings, animal_id)
+    name = _clean(request.POST.get(f'new_reinforcer_{animal.id}'))
+    if not name:
+        messages.warning(request, 'Enter a reinforcer.')
+        return
+    reinforcer = Reinforcer.objects.filter(name__iexact=name).first() or Reinforcer.objects.create(name=name)
+    animal.reinforcers.add(reinforcer)
+    messages.success(request, f'Added {reinforcer.name} to {animal.name}.')
+
+
+def _remove_reinforcer(request, strings, animal_id, reinforcer_id):
+    animal = _animal_for(strings, animal_id)
+    animal.reinforcers.remove(*Reinforcer.objects.filter(pk=reinforcer_id))
+    messages.success(request, 'Reinforcer removed.')
+
+
+MANAGE_ACTIONS = {
+    'add_string': _add_string, 'rename_string': _rename_string, 'set_division': _set_division,
+    'delete_string': _delete_string, 'add_keeper': _add_keeper, 'remove_keeper': _remove_keeper,
+    'add_animal': _add_animal, 'delete_animal': _delete_animal,
+    'add_behavior': _add_behavior, 'remove_behavior': _remove_behavior, 'move_behavior': _move_behavior,
+    'add_reinforcer': _add_reinforcer, 'remove_reinforcer': _remove_reinforcer,
+}
+
+
+@supervisor_required
+def manage_training(request):
+    strings = _manageable_strings(request.user)
+    if request.method == 'POST':
+        verb, *ids = request.POST.get('do', '').split(':')
+        handler = MANAGE_ACTIONS.get(verb)
+        if handler is None:
+            messages.warning(request, 'Unknown action.')
+        else:
+            handler(request, strings, *ids)
+        return redirect('zoo:manage_training')
+
+    animals = TrainingAnimal.objects.annotate(n_sessions=Count('training_sessions')).prefetch_related(
+        'maintenance_behaviors', 'new_behaviors', 'reinforcers',
+    )
+    strings = strings.select_related('division').prefetch_related(
+        'keepers', Prefetch('training_animals', queryset=animals),
+    )
+    return render(request, 'zoo/manage_training.html', {
+        'strings': strings,
+        'divisions': _my_divisions(request.user),
+        'is_superuser': request.user.is_superuser,
+        'users': User.objects.filter(is_active=True, is_superuser=False).order_by('username'),
+        'maintenance_names': Behavior.objects.filter(behavior_type='maintenance').values_list('name', flat=True),
+        'new_names': Behavior.objects.filter(behavior_type='new').values_list('name', flat=True),
+        'reinforcer_names': Reinforcer.objects.values_list('name', flat=True),
+    })

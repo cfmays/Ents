@@ -425,3 +425,102 @@ class DivisionScopingTests(TestCase):
         response = self.client.get('/admin/zoo/asg/')
         self.assertContains(response, 'ASG A')
         self.assertContains(response, 'ASG B')
+
+
+@override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
+class ManageTrainingTests(TestCase):
+
+    def setUp(self):
+        self.division_a = Division.objects.create(name='Terrestrial')
+        self.division_b = Division.objects.create(name='Aquatic')
+        self.string_a = String.objects.create(name='String A', division=self.division_a)
+        self.string_b = String.objects.create(name='String B', division=self.division_b)
+        self.animal = TrainingAnimal.objects.create(name='Rocky', string=self.string_a)
+        self.animal_b = TrainingAnimal.objects.create(name='Carl', string=self.string_b)
+
+        group, _ = Group.objects.get_or_create(name='Supervisor')
+        self.supervisor = User.objects.create_user('supa', password='pw', is_staff=True)
+        self.supervisor.groups.add(group)
+        self.supervisor.profile.divisions.add(self.division_a)
+        self.superuser = User.objects.create_superuser('rootm', 'r@example.com', 'pw')
+        self.keeper = User.objects.create_user('kate', password='pw')
+        self.url = reverse('zoo:manage_training')
+
+    def post(self, do, **data):
+        return self.client.post(self.url, {'do': do, **data}, follow=True)
+
+    def test_link_and_page_are_for_supervisors_only(self):
+        start = reverse('zoo:training_start')
+        self.client.force_login(self.keeper)
+        self.assertNotContains(self.client.get(start), 'Manage training logs')
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+        self.client.force_login(self.supervisor)
+        self.assertContains(self.client.get(start), 'Manage training logs')
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+
+    def test_supervisor_only_sees_and_changes_own_division(self):
+        self.client.force_login(self.supervisor)
+        page = self.client.get(self.url)
+        self.assertContains(page, 'String A')
+        self.assertNotContains(page, 'String B')
+        self.assertEqual(self.client.post(self.url, {'do': f'add_animal:{self.string_b.id}', f'new_animal_{self.string_b.id}': 'X'}).status_code, 404)
+        self.assertEqual(self.client.post(self.url, {'do': f'delete_animal:{self.animal_b.id}'}).status_code, 404)
+        self.assertTrue(TrainingAnimal.objects.filter(pk=self.animal_b.pk).exists())
+
+    def test_strings_add_rename_delete(self):
+        self.client.force_login(self.supervisor)
+        self.post('add_string', new_string='New String')
+        new = String.objects.get(name='New String')
+        self.assertEqual(new.division, self.division_a)  # supervisor's only division
+        self.post(f'rename_string:{new.id}', **{f'rename_{new.id}': 'Renamed'})
+        new.refresh_from_db()
+        self.assertEqual(new.name, 'Renamed')
+        self.assertContains(self.post(f'rename_string:{new.id}', **{f'rename_{new.id}': 'string a'}), 'already exists')
+        self.assertContains(self.post(f'delete_string:{self.string_a.id}'), 'still has training animals')
+        self.post(f'delete_string:{new.id}')
+        self.assertFalse(String.objects.filter(pk=new.id).exists())
+
+    def test_only_superuser_can_set_division(self):
+        self.client.force_login(self.supervisor)
+        response = self.client.post(self.url, {'do': f'set_division:{self.string_a.id}', f'division_{self.string_a.id}': self.division_b.id})
+        self.assertEqual(response.status_code, 403)
+        self.client.force_login(self.superuser)
+        self.post(f'set_division:{self.string_a.id}', **{f'division_{self.string_a.id}': self.division_b.id})
+        self.string_a.refresh_from_db()
+        self.assertEqual(self.string_a.division, self.division_b)
+
+    def test_keepers_add_and_remove(self):
+        self.client.force_login(self.supervisor)
+        self.post(f'add_keeper:{self.string_a.id}', **{f'new_keeper_{self.string_a.id}': self.keeper.id})
+        self.assertIn(self.keeper, self.string_a.keepers.all())
+        self.post(f'remove_keeper:{self.string_a.id}:{self.keeper.id}')
+        self.assertFalse(self.string_a.keepers.exists())
+
+    def test_animals_add_and_delete(self):
+        self.client.force_login(self.supervisor)
+        self.post(f'add_animal:{self.string_a.id}', **{f'new_animal_{self.string_a.id}': 'Nety'})
+        nety = TrainingAnimal.objects.get(name='Nety')
+        self.assertEqual(nety.string, self.string_a)
+        self.assertContains(self.post(f'add_animal:{self.string_a.id}', **{f'new_animal_{self.string_a.id}': 'ROCKY'}), 'already exists')
+        self.post(f'delete_animal:{nety.id}')
+        self.assertFalse(TrainingAnimal.objects.filter(pk=nety.id).exists())
+
+    def test_behaviors_reinforcers_and_move_to_maintenance(self):
+        self.client.force_login(self.supervisor)
+        aid = self.animal.id
+        self.post(f'add_behavior:{aid}:new', **{f'new_behavior_{aid}_new': 'Crate'})
+        self.post(f'add_behavior:{aid}:maintenance', **{f'new_behavior_{aid}_maintenance': 'Target'})
+        self.post(f'add_reinforcer:{aid}', **{f'new_reinforcer_{aid}': 'Grapes'})
+        crate = self.animal.new_behaviors.get()
+        self.assertEqual(self.animal.reinforcers.get().name, 'Grapes')
+
+        self.post(f'move_behavior:{aid}:{crate.id}')
+        self.assertFalse(self.animal.new_behaviors.exists())
+        self.assertEqual(sorted(self.animal.maintenance_behaviors.values_list('name', flat=True)), ['Crate', 'Target'])
+        self.assertEqual(Behavior.objects.get(name='Crate', behavior_type='maintenance').behavior_type, 'maintenance')
+
+        target = self.animal.maintenance_behaviors.get(name='Target')
+        self.post(f'remove_behavior:{aid}:maintenance:{target.id}')
+        self.post(f'remove_reinforcer:{aid}:{self.animal.reinforcers.get().id}')
+        self.assertEqual(self.animal.maintenance_behaviors.count(), 1)
+        self.assertFalse(self.animal.reinforcers.exists())

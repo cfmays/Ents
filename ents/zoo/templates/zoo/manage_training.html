@@ -1,0 +1,170 @@
+{% extends "base_generic.html" %}
+
+{% block content %}
+<style>
+  details.string-box { border: 1px solid #c9bd9c; border-radius: 6px; padding: 6px 10px; margin-bottom: 8px; background: #f8f0d8; }
+  details.animal-box { border-left: 3px solid #c9bd9c; padding-left: 10px; margin: 4px 0; }
+  details > summary { cursor: pointer; }
+  .mt-list { list-style: none; padding-left: 0; margin-bottom: 6px; }
+  .mt-list li { padding: 1px 0; }
+  .add-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .add-row input, .add-row select { max-width: 320px; }
+  .section-title { font-weight: bold; margin-top: 8px; }
+  .link-btn { padding: 0 4px; }
+</style>
+
+<h1>Manage training logs</h1>
+<p><a href="{% url 'zoo:training_start' %}">Back to Training Log</a></p>
+
+<form method="post" id="manage-form">
+  {% csrf_token %}
+
+  <div class="add-row" data-add-group>
+    <strong>New string:</strong>
+    <input type="text" name="new_string" class="form-control form-control-sm" placeholder="String name">
+    <select name="new_string_division" class="form-select form-select-sm" style="width:auto">
+      {% if is_superuser %}<option value="">No division</option>{% endif %}
+      {% for division in divisions %}<option value="{{ division.id }}">{{ division.name }}</option>{% endfor %}
+    </select>
+    <button type="submit" name="do" value="add_string" class="btn btn-sm btn-secondary">Add string</button>
+  </div>
+
+  {% for string in strings %}
+  <details class="string-box" id="string-{{ string.id }}">
+    <summary>
+      <strong>{{ string.name }}</strong>
+      <span class="text-muted small">
+        {{ string.division|default:"no division" }} &middot;
+        {{ string.keepers.all|length }} keeper{{ string.keepers.all|length|pluralize }} &middot;
+        {{ string.training_animals.all|length }} animal{{ string.training_animals.all|length|pluralize }}
+      </span>
+    </summary>
+
+    <div class="mt-2">
+      <div class="add-row" data-add-group>
+        <input type="text" name="rename_{{ string.id }}" value="{{ string.name }}" class="form-control form-control-sm">
+        <button type="submit" name="do" value="rename_string:{{ string.id }}" class="btn btn-sm btn-secondary">Rename</button>
+        <button type="submit" name="do" value="delete_string:{{ string.id }}" class="btn btn-sm btn-outline-danger"
+                onclick="return confirm('Delete the string {{ string.name|escapejs }}? (Only possible when it has no animals or calendars.)');">Delete string</button>
+      </div>
+
+      {% if is_superuser %}
+      <div class="add-row" data-add-group>
+        <span>Division:</span>
+        <select name="division_{{ string.id }}" class="form-select form-select-sm" style="width:auto">
+          <option value="">No division</option>
+          {% for division in divisions %}<option value="{{ division.id }}"{% if division.id == string.division_id %} selected{% endif %}>{{ division.name }}</option>{% endfor %}
+        </select>
+        <button type="submit" name="do" value="set_division:{{ string.id }}" class="btn btn-sm btn-secondary">Set division</button>
+      </div>
+      {% endif %}
+
+      <div class="section-title">Keepers</div>
+      <ul class="mt-list">
+        {% for keeper in string.keepers.all %}
+        <li>{{ keeper.username|capfirst }}
+          <button type="submit" name="do" value="remove_keeper:{{ string.id }}:{{ keeper.id }}" class="btn btn-link btn-sm text-danger link-btn">remove</button></li>
+        {% empty %}<li><em>None</em></li>{% endfor %}
+      </ul>
+      <div class="add-row" data-add-group>
+        <select name="new_keeper_{{ string.id }}" class="form-select form-select-sm" style="width:auto">
+          <option value="">Add a keeper&hellip;</option>
+          {% for user in users %}<option value="{{ user.id }}">{{ user.username|capfirst }}</option>{% endfor %}
+        </select>
+        <button type="submit" name="do" value="add_keeper:{{ string.id }}" class="btn btn-sm btn-secondary">Add keeper</button>
+      </div>
+
+      <div class="section-title">Training animals</div>
+      {% for animal in string.training_animals.all %}
+      <details class="animal-box" id="animal-{{ animal.id }}">
+        <summary>{{ animal.name }}
+          <span class="text-muted small">{{ animal.maintenance_behaviors.all|length }} maintenance &middot; {{ animal.new_behaviors.all|length }} new &middot; {{ animal.reinforcers.all|length }} reinforcers</span>
+        </summary>
+
+        <div class="section-title">Maintenance behaviors</div>
+        <ul class="mt-list">
+          {% for behavior in animal.maintenance_behaviors.all %}
+          <li>{{ behavior.name }}
+            <button type="submit" name="do" value="remove_behavior:{{ animal.id }}:maintenance:{{ behavior.id }}" class="btn btn-link btn-sm text-danger link-btn">remove</button></li>
+          {% empty %}<li><em>None</em></li>{% endfor %}
+        </ul>
+        <div class="add-row" data-add-group>
+          <input type="text" name="new_behavior_{{ animal.id }}_maintenance" list="maintenance-names" class="form-control form-control-sm" placeholder="Add a maintenance behavior">
+          <button type="submit" name="do" value="add_behavior:{{ animal.id }}:maintenance" class="btn btn-sm btn-secondary">Add</button>
+        </div>
+
+        <div class="section-title">New behaviors</div>
+        <ul class="mt-list">
+          {% for behavior in animal.new_behaviors.all %}
+          <li>{{ behavior.name }}
+            <button type="submit" name="do" value="move_behavior:{{ animal.id }}:{{ behavior.id }}" class="btn btn-link btn-sm link-btn">move to maintenance</button>
+            <button type="submit" name="do" value="remove_behavior:{{ animal.id }}:new:{{ behavior.id }}" class="btn btn-link btn-sm text-danger link-btn">remove</button></li>
+          {% empty %}<li><em>None</em></li>{% endfor %}
+        </ul>
+        <div class="add-row" data-add-group>
+          <input type="text" name="new_behavior_{{ animal.id }}_new" list="new-names" class="form-control form-control-sm" placeholder="Add a new behavior">
+          <button type="submit" name="do" value="add_behavior:{{ animal.id }}:new" class="btn btn-sm btn-secondary">Add</button>
+        </div>
+
+        <div class="section-title">Reinforcers</div>
+        <ul class="mt-list">
+          {% for reinforcer in animal.reinforcers.all %}
+          <li>{{ reinforcer.name }}
+            <button type="submit" name="do" value="remove_reinforcer:{{ animal.id }}:{{ reinforcer.id }}" class="btn btn-link btn-sm text-danger link-btn">remove</button></li>
+          {% empty %}<li><em>None</em></li>{% endfor %}
+        </ul>
+        <div class="add-row" data-add-group>
+          <input type="text" name="new_reinforcer_{{ animal.id }}" list="reinforcer-names" class="form-control form-control-sm" placeholder="Add a reinforcer">
+          <button type="submit" name="do" value="add_reinforcer:{{ animal.id }}" class="btn btn-sm btn-secondary">Add</button>
+        </div>
+
+        <button type="submit" name="do" value="delete_animal:{{ animal.id }}" class="btn btn-sm btn-outline-danger mb-2"
+                onclick="return confirm('Delete {{ animal.name|escapejs }} and its {{ animal.n_sessions }} logged training session{{ animal.n_sessions|pluralize }}? This cannot be undone.');">Delete animal</button>
+      </details>
+      {% empty %}<p><em>None</em></p>{% endfor %}
+
+      <div class="add-row" data-add-group>
+        <input type="text" name="new_animal_{{ string.id }}" class="form-control form-control-sm" placeholder="Add a training animal">
+        <button type="submit" name="do" value="add_animal:{{ string.id }}" class="btn btn-sm btn-secondary">Add animal</button>
+      </div>
+    </div>
+  </details>
+  {% empty %}
+  <p><em>No strings to manage.</em></p>
+  {% endfor %}
+</form>
+
+<datalist id="maintenance-names">{% for name in maintenance_names %}<option value="{{ name }}">{% endfor %}</datalist>
+<datalist id="new-names">{% for name in new_names %}<option value="{{ name }}">{% endfor %}</datalist>
+<datalist id="reinforcer-names">{% for name in reinforcer_names %}<option value="{{ name }}">{% endfor %}</datalist>
+
+<script>
+  var form = document.getElementById("manage-form");
+
+  // Enter in a box presses that box's own button, never some other button on the page
+  form.addEventListener("keydown", function (event) {
+    if (event.key !== "Enter" || event.target.tagName === "BUTTON") { return; }
+    event.preventDefault();
+    var group = event.target.closest("[data-add-group]");
+    var button = group && group.querySelector("button[name=do]");
+    if (button) { button.click(); }
+  });
+
+  // after a change the page reloads: reopen the sections that were open and keep the scroll position
+  form.addEventListener("submit", function () {
+    var open = Array.from(document.querySelectorAll("details[open]")).map(function (d) { return d.id; });
+    try {
+      sessionStorage.setItem("manageOpen", JSON.stringify(open));
+      sessionStorage.setItem("manageScroll", String(window.scrollY));
+    } catch (e) {}
+  });
+  try {
+    var openIds = JSON.parse(sessionStorage.getItem("manageOpen") || "[]");
+    var scroll = sessionStorage.getItem("manageScroll");
+    sessionStorage.removeItem("manageOpen");
+    sessionStorage.removeItem("manageScroll");
+    openIds.forEach(function (id) { var d = document.getElementById(id); if (d) { d.open = true; } });
+    if (scroll !== null) { window.scrollTo({ top: parseInt(scroll, 10), behavior: "instant" }); }
+  } catch (e) {}
+</script>
+{% endblock %}
