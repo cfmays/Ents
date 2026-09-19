@@ -182,6 +182,11 @@ class KeeperAccessScopingTests(TestCase):
         response = self.client.post(reverse('zoo:calendar_tab', args=[self.asg.id]), data)
         self.assertContains(response, 'Please choose an enrichment item.')
 
+    def test_calendar_page_is_not_cached_by_the_browser(self):
+        self.client.force_login(self.assigned_keeper)
+        response = self.client.get(reverse('zoo:calendar_tab', args=[self.asg.id]))
+        self.assertIn('no-store', response['Cache-Control'])
+
     def test_print_view_has_entries_but_not_score_or_note_columns(self):
         item = Enrichment.objects.create(name='Ball', photo=make_image_file(name='ball.png'))
         ASGApprovedItem.objects.create(asg=self.asg, item=item, comments='Stays up')
@@ -197,6 +202,22 @@ class KeeperAccessScopingTests(TestCase):
 
         self.client.force_login(self.unassigned_keeper)
         self.assertEqual(self.client.get(url).status_code, 403)
+
+    def test_save_and_print_goes_to_the_print_page_only_when_saved(self):
+        item = Enrichment.objects.create(name='Ball', photo=make_image_file(name='ball.png'))
+        ASGApprovedItem.objects.create(asg=self.asg, item=item)
+        self.client.force_login(self.assigned_keeper)
+        url = reverse('zoo:calendar_tab', args=[self.asg.id, 2026, 9])
+        data = {
+            'form-TOTAL_FORMS': '1', 'form-INITIAL_FORMS': '0', 'form-MIN_NUM_FORMS': '0', 'form-MAX_NUM_FORMS': '1000',
+            'form-0-date': '2026-09-05', 'form-0-item': str(item.id), 'print_after': '1',
+        }
+        response = self.client.post(url, data)
+        self.assertRedirects(response, reverse('zoo:calendar_print', args=[self.asg.id, 2026, 9]))
+        self.assertEqual(CalendarEntry.objects.count(), 1)
+
+        data['form-0-date'] = ''  # invalid row: stays on the calendar with the message, nothing extra saved
+        self.assertContains(self.client.post(url, data), 'Please enter a date.')
 
     def test_saving_a_date_outside_the_month_shows_an_error(self):
         item = Enrichment.objects.create(name='Ball', photo=make_image_file(name='ball.png'))

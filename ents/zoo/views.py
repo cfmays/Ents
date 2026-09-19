@@ -11,6 +11,7 @@ from django.db.models import Count, Prefetch, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
 from .forms import item_labels_for, AddAnimalChoiceForm, AddBehaviorGoalForm, ItemAssignmentForm, TrainingSessionForm, TrainingStringForm, make_calendar_entry_formset
@@ -46,7 +47,9 @@ def asg_list(request):
     return render(request, 'zoo/asg_list.html', {'strings': strings})
 
 
+# never cached, so Back from the print page shows what was just saved, not an old copy
 @login_required
+@never_cache
 def calendar_tab(request, asg_id, year=None, month=None):
     asg = _get_accessible_asg(request, asg_id)
     today = date.today()
@@ -70,6 +73,8 @@ def calendar_tab(request, asg_id, year=None, month=None):
                     instance.created_by = request.user
                 instance.save()
             messages.success(request, 'Calendar saved.')
+            if request.POST.get('print_after'):
+                return redirect('zoo:calendar_print', asg_id=asg.id, year=year, month=month)
             return redirect('zoo:calendar_tab', asg_id=asg.id, year=year, month=month)
     else:
         formset = FormSet(queryset=queryset)

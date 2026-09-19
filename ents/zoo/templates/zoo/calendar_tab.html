@@ -38,7 +38,7 @@
   <h1 class="mb-0">{{ asg.name }} &mdash; {{ month_name }}</h1>
   <a class="btn btn-outline-secondary btn-sm" href="{% url 'zoo:calendar_tab' asg.id prev_year prev_month %}">&laquo; Previous month</a>
   <a class="btn btn-outline-secondary btn-sm" href="{% url 'zoo:calendar_tab' asg.id next_year next_month %}">Next month &raquo;</a>
-  <a class="btn btn-outline-secondary btn-sm" href="{% url 'zoo:calendar_print' asg.id year month %}" target="_blank" title="Prints the saved entries">Print</a>
+  <a id="print-link" class="btn btn-outline-secondary btn-sm" href="{% url 'zoo:calendar_print' asg.id year month %}" target="_blank" title="Prints the saved entries">Print</a>
 </div>
 <p class="mt-2">
   <a href="{% url 'zoo:list_management_tab' asg.id %}">List management</a> |
@@ -59,6 +59,15 @@
 <p><strong>Notes:</strong> {{ asg.notes }}</p>
 {% endif %}
 
+
+<div id="save-first" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:2000;">
+  <div style="background:#fff; max-width:540px; margin:20vh auto; padding:20px; border-radius:8px;">
+    <p><strong>You have unsaved changes.</strong><br>Only saved entries are printed. Save the calendar first?</p>
+    <button type="button" id="save-and-print" class="btn btn-primary btn-sm">Save, then print</button>
+    <button type="button" id="print-anyway" class="btn btn-outline-secondary btn-sm">Print without saving</button>
+    <button type="button" id="cancel-print" class="btn btn-outline-secondary btn-sm">Cancel</button>
+  </div>
+</div>
 
 <div id="copy-message"></div>
 <form method="post" id="calendar-form">
@@ -199,6 +208,25 @@
 
   $("#add-row-btn").click(function () {
     addRow();
+  });
+
+  // Print only prints saved entries, so offer to save first when the page has unsaved changes
+  var unsaved = false;
+  $("#calendar-form").on("input change", function () { unsaved = true; }).on("submit", function () { unsaved = false; });
+
+  $("#print-link").click(function (event) {
+    if (!unsaved) { return; }
+    event.preventDefault();
+    $("#save-first").show();
+  });
+  $("#cancel-print").click(function () { $("#save-first").hide(); });
+  $("#print-anyway").click(function () {
+    $("#save-first").hide();
+    window.open($("#print-link").attr("href"), "_blank");
+  });
+  $("#save-and-print").click(function () {
+    $('<input type="hidden" name="print_after" value="1">').appendTo("#calendar-form");
+    $("#calendar-form")[0].requestSubmit();
   });
 
   // Copy runs in the background so nothing on the page is lost or reloaded
