@@ -1,4 +1,5 @@
 import calendar
+import re
 from datetime import date
 
 from django.contrib import messages
@@ -12,8 +13,9 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from .forms import AddAnimalChoiceForm, AddBehaviorGoalForm, ItemAssignmentForm, TrainingSessionForm, TrainingStringForm, make_calendar_entry_formset
-from .models import ASG, ASGApprovedItem, Animal, default_is_food, BehaviorScore, CalendarEntry, Profile, String, TrainingAnimal, TrainingSession
-from .permissions import supervisor_required, user_can_access_asg, user_can_access_string, user_can_access_training_animal
+from ents.models import Enrichment
+from .models import ASG, ASGApprovedItem, Animal, default_is_food, BehaviorGoal, BehaviorScore, CalendarEntry, Profile, SpecialConcern, String, TrainingAnimal, TrainingSession
+from .permissions import is_supervisor, supervisor_required, user_can_access_asg, user_can_access_string, user_can_access_training_animal
 
 
 def _get_accessible_asg(request, asg_id):
@@ -200,6 +202,54 @@ def calendar_paste(request, asg_id, year, month):
     return back
 
 
+def _change_items(request, asg):
+    """Supervisor edits of this calendar's approved items (each item sits in the food or non-food column)."""
+    post = request.POST
+    if 'remove_item' in post:
+        ASGApprovedItem.objects.filter(asg=asg, pk=post['remove_item']).delete()
+        messages.success(request, 'Item removed from this calendar.')
+        return
+    item = Enrichment.objects.filter(pk=post.get('item')).first()
+    if item is None:
+        messages.warning(request, 'Choose an item to add.')
+        return
+    _, created = ASGApprovedItem.objects.get_or_create(
+        asg=asg, item=item, is_food=post['add_item'] == 'food',
+        defaults={'comments': post.get('comments', '').strip()[:500], 'rate': post.get('rate', '').strip()[:100]},
+    )
+    if created:
+        messages.success(request, f'Added {item.name}.')
+    else:
+        messages.warning(request, f'{item.name} is already in that column.')
+
+
+def _change_concerns_or_goals(request, asg):
+    """Supervisor edits of this calendar's special concerns / behavior goals (removing only unlinks them here)."""
+    post = request.POST
+    if 'remove_concern' in post:
+        asg.special_concerns.remove(*SpecialConcern.objects.filter(pk=post['remove_concern']))
+        messages.success(request, 'Special concern removed from this calendar.')
+    elif 'remove_goal' in post:
+        asg.behavior_goals.remove(*BehaviorGoal.objects.filter(pk=post['remove_goal']))
+        messages.success(request, 'Behavior goal removed from this calendar.')
+    elif 'add_concern' in post:
+        text = re.sub(r'\s+', ' ', post['add_concern']).strip()
+        if not text or len(text) > 500:
+            messages.warning(request, 'Enter a special concern of up to 500 characters.')
+            return
+        concern = SpecialConcern.objects.filter(text__iexact=text).first() or SpecialConcern.objects.create(text=text)
+        asg.special_concerns.add(concern)
+        messages.success(request, 'Special concern added.')
+    else:
+        name = re.sub(r'\s+', ' ', post['add_goal_text']).strip()
+        if not name or len(name) > 255:
+            messages.warning(request, 'Enter a behavior goal of up to 255 characters.')
+            return
+        goal = BehaviorGoal.objects.filter(name__iexact=name).first() or BehaviorGoal.objects.create(name=name)
+        asg.behavior_goals.add(goal)
+        messages.success(request, 'Behavior goal added.')
+
+
 @login_required
 def list_management_tab(request, asg_id):
     asg = _get_accessible_asg(request, asg_id)
@@ -218,6 +268,16 @@ def list_management_tab(request, asg_id):
                 animal_form.save()
                 messages.success(request, 'Animal choice added.')
                 return redirect('zoo:list_management_tab', asg_id=asg.id)
+        elif any(key in request.POST for key in ('add_concern', 'add_goal_text', 'remove_concern', 'remove_goal')):
+            if not is_supervisor(request.user):
+                raise PermissionDenied('Only supervisors can change special concerns and behavior goals.')
+            _change_concerns_or_goals(request, asg)
+            return redirect('zoo:list_management_tab', asg_id=asg.id)
+        elif 'add_item' in request.POST or 'remove_item' in request.POST:
+            if not is_supervisor(request.user):
+                raise PermissionDenied('Only supervisors can change approved items.')
+            _change_items(request, asg)
+            return redirect('zoo:list_management_tab', asg_id=asg.id)
         else:
             form = AddBehaviorGoalForm(request.POST, asg=asg)
             if form.is_valid():
@@ -233,8 +293,13 @@ def list_management_tab(request, asg_id):
         'asg': asg,
         'form': form,
         'animal_form': animal_form,
-        'food_items': food_items,
-        'non_food_items': non_food_items,
+        'can_edit_lists': is_supervisor(request.user),
+        'concern_suggestions': SpecialConcern.objects.exclude(asgs=asg),
+        'goal_suggestions': BehaviorGoal.objects.exclude(asgs=asg),
+        'columns': [
+            ('Approved non-food enrichment', 'nonfood', Enrichment.objects.exclude(asg_assignments__in=non_food_items), non_food_items),
+            ('Approved food enrichment', 'food', Enrichment.objects.exclude(asg_assignments__in=food_items), food_items),
+        ],
     })
 
 

@@ -31,59 +31,145 @@
 <h4>Special concerns</h4>
 <ul>
   {% for concern in asg.special_concerns.all %}
-  <li>{{ concern.text }}</li>
+  <li>
+    {{ concern.text }}
+    {% if can_edit_lists %}
+    <form method="post" class="d-inline" onsubmit="return confirm('Remove this special concern from {{ asg.name|escapejs }}?');">
+      {% csrf_token %}
+      <button type="submit" name="remove_concern" value="{{ concern.id }}" class="btn btn-link btn-sm text-danger">remove</button>
+    </form>
+    {% endif %}
+  </li>
   {% empty %}
   <li><em>None</em></li>
   {% endfor %}
 </ul>
+{% if can_edit_lists %}
+<form method="post" class="mb-3" style="display:flex;gap:8px;align-items:center">
+  {% csrf_token %}
+  <input type="text" name="add_concern" list="concern-suggestions" maxlength="500" class="form-control" style="width:500px" placeholder="Type a new concern, or pick an existing one">
+  <datalist id="concern-suggestions">
+    {% for concern in concern_suggestions %}<option value="{{ concern.text }}">{% endfor %}
+  </datalist>
+  <button type="submit" class="btn btn-sm btn-secondary">Add concern</button>
+</form>
+{% endif %}
 
 <h4>Behavior goals</h4>
 <ul>
   {% for goal in asg.behavior_goals.all %}
-  <li>{{ goal.name }}</li>
+  <li>
+    {{ goal.name }}
+    {% if can_edit_lists %}
+    <form method="post" class="d-inline" onsubmit="return confirm('Remove this behavior goal from {{ asg.name|escapejs }}?');">
+      {% csrf_token %}
+      <button type="submit" name="remove_goal" value="{{ goal.id }}" class="btn btn-link btn-sm text-danger">remove</button>
+    </form>
+    {% endif %}
+  </li>
   {% empty %}
   <li><em>None</em></li>
   {% endfor %}
 </ul>
+{% if can_edit_lists %}
+<form method="post" style="display:flex;gap:8px;align-items:center">
+  {% csrf_token %}
+  <input type="text" name="add_goal_text" list="goal-suggestions" maxlength="255" class="form-control" style="width:400px" placeholder="Type a new goal, or pick an existing one">
+  <datalist id="goal-suggestions">
+    {% for goal in goal_suggestions %}<option value="{{ goal.name }}">{% endfor %}
+  </datalist>
+  <button type="submit" class="btn btn-sm btn-secondary">Add goal</button>
+</form>
+{% else %}
 <form method="post" class="form-inline">
   {% csrf_token %}
   {{ form.behavior_goal }}
   <button type="submit" class="btn btn-sm btn-secondary">Add goal</button>
 </form>
+{% endif %}
 
-<h4 class="mt-4">Approved non-food enrichment</h4>
-<div class="row">
-  {% for assignment in non_food_items %}
-  <div class="col-auto text-center mb-3">
-    {% if assignment.item.photo %}
-    <img src="{{ assignment.item.photo.url }}" style="height:50px;width:50px;object-fit:cover;border-radius:4px;">
-    {% else %}
-    <div style="height:50px;width:50px;background:#ddd;border-radius:4px;" class="mx-auto"></div>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css">
+<style>
+  .item-pick-dropdown .select2-results__option { white-space: normal; }
+  .item-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid #d8ccae; }
+  .item-row .item-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+</style>
+
+<div class="row mt-4">
+  {% for title, kind, choices, assignments in columns %}
+  <div class="col-md-6">
+    <h4>{{ title }}</h4>
+    {% if can_edit_lists %}
+    <form method="post" class="mb-3 p-2 border rounded">
+      {% csrf_token %}
+      <select name="item" class="item-pick" style="width:100%">
+        <option value="">Add item&hellip; (search by name)</option>
+        {% for item in choices %}<option value="{{ item.id }}"{% if item.photo %} data-thumb="{{ item.photo.url }}"{% endif %}>{{ item.name }}</option>{% endfor %}
+      </select>
+      <div style="display:flex;gap:8px;margin-top:6px">
+        <input type="text" name="comments" maxlength="500" class="form-control form-control-sm" placeholder="Comments (optional)">
+        <input type="text" name="rate" maxlength="100" class="form-control form-control-sm" placeholder="Rate" style="width:80px">
+        <button type="submit" name="add_item" value="{{ kind }}" class="btn btn-sm btn-secondary" style="white-space:nowrap">Add item</button>
+      </div>
+    </form>
     {% endif %}
-    <div>{{ assignment.item.name }}</div>
-    {% if assignment.comments %}<div class="text-muted small">{{ assignment.comments }}</div>{% endif %}
-    {% if assignment.rate %}<div class="text-muted small">Rate: {{ assignment.rate }}</div>{% endif %}
+
+    {% for assignment in assignments %}
+    <div class="item-row">
+      {% if assignment.item.photo %}
+      <img src="{{ assignment.item.photo.url }}" style="height:50px;width:50px;flex-shrink:0;object-fit:cover;border-radius:4px;">
+      {% else %}
+      <div style="height:50px;width:50px;flex-shrink:0;background:#ddd;border-radius:4px;"></div>
+      {% endif %}
+      <div class="item-text">
+        {{ assignment.item.name }}
+        {% if assignment.comments %}<div class="text-muted small">{{ assignment.comments }}</div>{% endif %}
+        {% if assignment.rate %}<div class="text-muted small">Rate: {{ assignment.rate }}</div>{% endif %}
+      </div>
+      {% if can_edit_lists %}
+      <form method="post" onsubmit="return confirm('Remove this item from {{ asg.name|escapejs }}?');">
+        {% csrf_token %}
+        <button type="submit" name="remove_item" value="{{ assignment.id }}" class="btn btn-link btn-sm text-danger">remove</button>
+      </form>
+      {% endif %}
+    </div>
+    {% empty %}
+    <p><em>None</em></p>
+    {% endfor %}
   </div>
-  {% empty %}
-  <p><em>None</em></p>
   {% endfor %}
 </div>
 
-<h4>Approved food enrichment</h4>
-<div class="row">
-  {% for assignment in food_items %}
-  <div class="col-auto text-center mb-3">
-    {% if assignment.item.photo %}
-    <img src="{{ assignment.item.photo.url }}" style="height:50px;width:50px;object-fit:cover;border-radius:4px;">
-    {% else %}
-    <div style="height:50px;width:50px;background:#ddd;border-radius:4px;" class="mx-auto"></div>
-    {% endif %}
-    <div>{{ assignment.item.name }}</div>
-    {% if assignment.comments %}<div class="text-muted small">{{ assignment.comments }}</div>{% endif %}
-    {% if assignment.rate %}<div class="text-muted small">Rate: {{ assignment.rate }}</div>{% endif %}
-  </div>
-  {% empty %}
-  <p><em>None</em></p>
-  {% endfor %}
-</div>
+{% if can_edit_lists %}
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+  function formatItem(item) {
+    if (!item.id) { return item.text; }
+    var thumb = $(item.element).data("thumb");
+    if (!thumb) { return item.text; }
+    return $('<span style="display:flex;align-items:center;"><img src="' + thumb +
+      '" style="height:40px;width:40px;flex-shrink:0;object-fit:cover;border-radius:4px;margin-right:8px;"><span class="item-label"></span></span>')
+      .find(".item-label").text(item.text).end();
+  }
+  $(".item-pick").select2({ width: "100%", templateResult: formatItem, templateSelection: formatItem }).on("select2:open", function () {
+    $(this).data("select2").$dropdown.addClass("item-pick-dropdown");
+  });
+</script>
+{% endif %}
+<script>
+  // keep the page where it was after any add/remove on this page
+  document.querySelectorAll("form").forEach(function (form) {
+    form.addEventListener("submit", function () {
+      try { sessionStorage.setItem("listScroll", String(window.scrollY)); } catch (e) {}
+    });
+  });
+  try {
+    var saved = sessionStorage.getItem("listScroll");
+    if (saved !== null) {
+      sessionStorage.removeItem("listScroll");
+      // wait for images/select2 so the page is full height, then jump back
+      window.addEventListener("load", function () { window.scrollTo({ top: parseInt(saved, 10), behavior: "instant" }); });
+    }
+  } catch (e) {}
+</script>
 {% endblock %}

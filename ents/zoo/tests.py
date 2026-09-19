@@ -8,7 +8,7 @@ from django.urls import reverse
 from ents.models import Enrichment
 from ents.tests import make_image_file
 
-from .models import ASG, ASGApprovedItem, Animal, Behavior, BehaviorGoal, BehaviorScore, CalendarEntry, Division, Reinforcer, String, TrainingAnimal
+from .models import SpecialConcern, ASG, ASGApprovedItem, Animal, Behavior, BehaviorGoal, BehaviorScore, CalendarEntry, Division, Reinforcer, String, TrainingAnimal
 
 TEST_MEDIA_ROOT = tempfile.mkdtemp(prefix='zoo_test_media_')
 
@@ -258,6 +258,62 @@ class KeeperAccessScopingTests(TestCase):
         response = self.client.post(reverse('zoo:calendar_paste', args=[self.asg.id, 2026, 9]), follow=True)
         self.assertContains(response, 'only works within the same calendar')
         self.assertFalse(CalendarEntry.objects.filter(asg=self.asg).exists())
+
+    def test_supervisor_can_add_and_remove_concerns_and_goals_but_keeper_cannot(self):
+        supervisor_group, _ = Group.objects.get_or_create(name='Supervisor')
+        supervisor = User.objects.create_user('boss3', password='pw', is_staff=True)
+        supervisor.groups.add(supervisor_group)
+        supervisor.profile.divisions.add(self.division)
+        url = reverse('zoo:list_management_tab', args=[self.asg.id])
+
+        self.client.force_login(supervisor)
+        self.client.post(url, {'add_concern': '  No   steel in tires '})
+        self.client.post(url, {'add_concern': 'no steel in tires'})  # same text: reuses the concern
+        self.client.post(url, {'add_goal_text': 'Roll'})
+        self.assertEqual(SpecialConcern.objects.count(), 1)
+        concern = self.asg.special_concerns.get()
+        goal = self.asg.behavior_goals.get()
+        self.assertEqual((concern.text, goal.name), ('No steel in tires', 'Roll'))
+
+        self.client.post(url, {'remove_concern': concern.id})
+        self.client.post(url, {'remove_goal': goal.id})
+        self.assertFalse(self.asg.special_concerns.exists() or self.asg.behavior_goals.exists())
+        self.assertTrue(SpecialConcern.objects.filter(pk=concern.id).exists())  # only unlinked from this calendar
+
+        self.client.force_login(self.assigned_keeper)
+        self.assertEqual(self.client.post(url, {'add_concern': 'Sneaky'}).status_code, 403)
+        self.assertEqual(self.client.post(url, {'remove_concern': concern.id}).status_code, 403)
+        self.assertFalse(SpecialConcern.objects.filter(text='Sneaky').exists())
+        self.assertNotContains(self.client.get(url), 'Add concern')
+
+    def test_supervisor_can_add_and_remove_approved_items_but_keeper_cannot(self):
+        supervisor_group, _ = Group.objects.get_or_create(name='Supervisor')
+        supervisor = User.objects.create_user('boss4', password='pw', is_staff=True)
+        supervisor.groups.add(supervisor_group)
+        supervisor.profile.divisions.add(self.division)
+        item = Enrichment.objects.create(name='Coloring', photo=make_image_file(name='c.png'))
+        url = reverse('zoo:list_management_tab', args=[self.asg.id])
+
+        self.client.force_login(supervisor)
+        self.client.post(url, {'add_item': 'nonfood', 'item': item.id, 'comments': 'Non-toxic only', 'rate': '2'})
+        self.client.post(url, {'add_item': 'food', 'item': item.id})  # same item, other column
+        self.client.post(url, {'add_item': 'food', 'item': item.id})  # duplicate: ignored
+        rows = ASGApprovedItem.objects.filter(asg=self.asg)
+        self.assertEqual(rows.count(), 2)
+        nonfood = rows.get(is_food=False)
+        self.assertEqual((nonfood.comments, nonfood.rate), ('Non-toxic only', '2'))
+        response = self.client.get(url)
+        self.assertContains(response, 'Approved non-food enrichment')
+        self.assertContains(response, 'Approved food enrichment')
+
+        self.client.post(url, {'remove_item': nonfood.id})
+        self.assertEqual(rows.count(), 1)
+
+        self.client.force_login(self.assigned_keeper)
+        self.assertEqual(self.client.post(url, {'add_item': 'food', 'item': item.id, 'comments': 'x'}).status_code, 403)
+        self.assertEqual(self.client.post(url, {'remove_item': rows.get().id}).status_code, 403)
+        self.assertEqual(rows.count(), 1)
+        self.assertNotContains(self.client.get(url), 'Add item')
 
     def test_keeper_can_add_and_remove_animal_choice(self):
         self.client.force_login(self.assigned_keeper)
