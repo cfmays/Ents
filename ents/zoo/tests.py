@@ -1,5 +1,7 @@
 import shutil
 import tempfile
+from datetime import date
+from unittest import mock
 
 from django.contrib.auth.models import Group, User
 from django.test import TestCase, override_settings
@@ -110,6 +112,9 @@ class TrainingFlowTests(TestCase):
 class KeeperAccessScopingTests(TestCase):
 
     def setUp(self):
+        patcher = mock.patch('zoo.views._today', return_value=date(2026, 9, 19))  # calendar tests use Sept 2026
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.division = Division.objects.create(name='Aquatic')
         self.string = String.objects.create(name='Aquarium Bird/ Reptile', division=self.division)
         self.asg = ASG.objects.create(name='Penguin', string=self.string)
@@ -161,6 +166,49 @@ class KeeperAccessScopingTests(TestCase):
         self.client.force_login(self.superuser)
         response = self.client.get(reverse('zoo:calendar_tab', args=[self.asg.id]))
         self.assertEqual(response.status_code, 200)
+
+    def test_animal_column_only_shows_when_the_calendar_has_animal_choices(self):
+        self.client.force_login(self.assigned_keeper)
+        page_url = reverse('zoo:calendar_tab', args=[self.asg.id])
+        print_url = reverse('zoo:calendar_print', args=[self.asg.id, 2026, 9])
+        for url in (page_url, print_url):
+            self.assertNotContains(self.client.get(url), '>Animal<')
+        response = self.client.get(page_url)
+        self.assertNotContains(response, 'form-0-animal')
+
+        Animal.objects.create(asg=self.asg, name='Carl')
+        for url in (page_url, print_url):
+            self.assertContains(self.client.get(url), '>Animal<')
+        self.assertContains(self.client.get(page_url), 'form-0-animal')
+
+    def test_past_months_are_read_only_but_can_still_be_copied(self):
+        item = Enrichment.objects.create(name='Ball', photo=make_image_file(name='ball.png'))
+        ASGApprovedItem.objects.create(asg=self.asg, item=item)
+        CalendarEntry.objects.create(asg=self.asg, date='2026-08-03', item=item, do_score=3, notes='old note')
+        self.client.force_login(self.assigned_keeper)
+        aug = reverse('zoo:calendar_tab', args=[self.asg.id, 2026, 8])
+
+        page = self.client.get(aug)
+        self.assertContains(page, 'past month and is read only')
+        self.assertContains(page, 'old note')
+        for editable in ('form-0-date', '>Save calendar<', '>+ Add row<', '>Paste<'):
+            self.assertNotContains(page, editable)
+        self.assertContains(page, '>Copy<')
+
+        data = {
+            'form-TOTAL_FORMS': '1', 'form-INITIAL_FORMS': '0', 'form-MIN_NUM_FORMS': '0', 'form-MAX_NUM_FORMS': '1000',
+            'form-0-date': '2026-08-05', 'form-0-item': str(item.id),
+        }
+        self.assertContains(self.client.post(aug, data, follow=True), 'read only')
+        self.assertEqual(CalendarEntry.objects.count(), 1)  # nothing added
+
+        self.client.post(reverse('zoo:calendar_copy', args=[self.asg.id, 2026, 8]))  # copying from the past is the point
+        self.assertContains(self.client.post(reverse('zoo:calendar_paste', args=[self.asg.id, 2026, 7]), follow=True), 'read only')
+        self.client.post(reverse('zoo:calendar_paste', args=[self.asg.id, 2026, 10]))
+        self.assertTrue(CalendarEntry.objects.filter(date='2026-10-03').exists())  # future months take pastes
+
+        this_month = self.client.get(reverse('zoo:calendar_tab', args=[self.asg.id, 2026, 9]))
+        self.assertContains(this_month, '>Save calendar<')
 
     def test_calendar_animal_dropdown_offers_the_calendars_choices_only(self):
         Animal.objects.create(asg=self.asg, name='Carl/ Pat')

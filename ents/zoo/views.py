@@ -22,6 +22,10 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from .permissions import available_divisions, division_scope, is_supervisor, supervisor_required, user_can_access_asg, user_can_access_string, user_can_access_training_animal
 
 
+def _today():
+    return date.today()  # a function so tests can pin the date
+
+
 def _get_accessible_asg(request, asg_id):
     asg = get_object_or_404(ASG, pk=asg_id)
     if not user_can_access_asg(request.user, asg):
@@ -52,7 +56,7 @@ def asg_list(request):
 @never_cache
 def calendar_tab(request, asg_id, year=None, month=None):
     asg = _get_accessible_asg(request, asg_id)
-    today = date.today()
+    today = _today()
     year = int(year) if year else today.year
     month = int(month) if month else today.month
 
@@ -63,6 +67,11 @@ def calendar_tab(request, asg_id, year=None, month=None):
     FormSet = make_calendar_entry_formset(asg, year, month)
     queryset = CalendarEntry.objects.filter(asg=asg, date__gte=month_start, date__lte=month_end)
 
+    read_only = (year, month) < (today.year, today.month)  # past months can't be changed
+
+    if request.method == 'POST' and read_only:
+        messages.warning(request, f'{_month_label(year, month)} is a past month and is read only.')
+        return redirect('zoo:calendar_tab', asg_id=asg.id, year=year, month=month)
     if request.method == 'POST':
         formset = FormSet(request.POST, queryset=queryset)
         if formset.is_valid():
@@ -82,6 +91,7 @@ def calendar_tab(request, asg_id, year=None, month=None):
     prev_month = (month_start.replace(day=1) - date.resolution).replace(day=1)
     next_month = (month_end + date.resolution)
 
+    labels = item_labels_for(asg) if read_only else {}
     clip = request.session.get('calendar_clipboard')
     clipboard = None
     if clip and clip['asg_id'] == asg.id:
@@ -91,6 +101,12 @@ def calendar_tab(request, asg_id, year=None, month=None):
         'asg': asg,
         'clipboard': clipboard,
         'can_manage_lists': is_supervisor(request.user),
+        'has_animals': asg.animals.exists(),
+        'read_only': read_only,
+        'read_only_rows': [
+            (entry, labels.get(entry.item_id, entry.item.name))
+            for entry in queryset.select_related('item', 'animal', 'behavior_goal')
+        ] if read_only else [],
         'formset': formset,
         'year': year,
         'month': month,
@@ -122,6 +138,7 @@ def calendar_print(request, asg_id, year, month):
         'asg': asg,
         'month_name': _month_label(year, month),
         'rows': [(entry, labels.get(entry.item_id, entry.item.name)) for entry in entries],
+        'has_animals': asg.animals.exists(),
         'year': year,
         'month': month,
     })
@@ -172,6 +189,10 @@ def calendar_paste(request, asg_id, year, month):
     asg = _get_accessible_asg(request, asg_id)
     clip = request.session.get('calendar_clipboard')
     back = redirect('zoo:calendar_tab', asg_id=asg.id, year=year, month=month)
+    today = _today()
+    if (year, month) < (today.year, today.month):
+        messages.warning(request, f'{_month_label(year, month)} is a past month and is read only.')
+        return back
     if not clip:
         messages.warning(request, 'Nothing to paste yet: use Copy on another month first.')
         return back

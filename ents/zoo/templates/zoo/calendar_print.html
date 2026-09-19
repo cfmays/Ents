@@ -36,13 +36,13 @@
 
   <table>
     <thead>
-      <tr><th style="width:80px">Date</th><th>Animal</th><th>Enrichment item</th><th>Behavior goal</th></tr>
+      <tr><th style="width:80px">Date</th>{% if has_animals %}<th>Animal</th>{% endif %}<th>Enrichment item</th><th>Behavior goal</th></tr>
     </thead>
     <tbody>
       {% for entry, label in rows %}
       <tr>
         <td>{{ entry.date|date:"D n/j" }}</td>
-        <td>{{ entry.animal|default:"" }}</td>
+        {% if has_animals %}<td>{{ entry.animal|default:"" }}</td>{% endif %}
         <td>
           <div class="item">
             {% if entry.item.photo %}<img src="{{ entry.item.photo.url }}" alt="">{% endif %}
@@ -52,7 +52,7 @@
         <td>{{ entry.behavior_goal|default:"" }}</td>
       </tr>
       {% empty %}
-      <tr><td colspan="4"><em>No saved entries for {{ month_name }}.</em></td></tr>
+      <tr><td colspan="{% if has_animals %}4{% else %}3{% endif %}"><em>No saved entries for {{ month_name }}.</em></td></tr>
       {% endfor %}
     </tbody>
   </table>

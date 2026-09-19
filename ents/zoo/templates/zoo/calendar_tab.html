@@ -70,6 +70,42 @@
 </div>
 
 <div id="copy-message"></div>
+{% if read_only %}
+<div class="alert alert-secondary">{{ month_name }} is a past month and is read only.</div>
+<table class="table table-sm">
+  <thead>
+    <tr>
+      <th>Date</th>
+      {% if has_animals %}<th>Animal</th>{% endif %}
+      <th>Enrichment item</th>
+      <th>Behavior goal</th>
+      <th>DO</th><th>IO</th><th>GBS</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for entry, label in read_only_rows %}
+    <tr>
+      <td>{{ entry.date|date:"D n/j" }}</td>
+      {% if has_animals %}<td>{{ entry.animal|default:"" }}</td>{% endif %}
+      <td>{{ label }}</td>
+      <td>{{ entry.behavior_goal|default:"" }}</td>
+      <td>{{ entry.get_do_score_display|default:"" }}</td>
+      <td>{{ entry.get_io_score_display|default:"" }}</td>
+      <td>{{ entry.get_gbs_score_display|default:"" }}</td>
+      <td>{{ entry.notes }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="8"><em>No entries in {{ month_name }}.</em></td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+<form method="post" id="calendar-form" style="text-align:right">
+  {% csrf_token %}
+  <span id="clipboard-note" class="text-muted small" style="margin-right:8px">{% if clipboard %}Copied: {{ clipboard }}{% endif %}</span>
+  <button type="button" id="copy-btn" class="btn btn-outline-secondary calendar-btn">Copy</button>
+</form>
+{% else %}
 <form method="post" id="calendar-form">
   {% csrf_token %}
   {{ formset.management_form }}
@@ -77,7 +113,7 @@
     <thead>
       <tr>
         <th>Date</th>
-        <th>Animal</th>
+        {% if has_animals %}<th>Animal</th>{% endif %}
         <th>Enrichment item</th>
         <th>Behavior goal</th>
         <th>DO</th>
@@ -91,7 +127,7 @@
       <tr>
         {{ form.id }}
         <td>{{ form.date }}</td>
-        <td>{{ form.animal }}</td>
+        {% if has_animals %}<td>{{ form.animal }}</td>{% endif %}
         <td>{{ form.item }}</td>
         <td>{{ form.behavior_goal }}</td>
         <td>{{ form.do_score }}</td>
@@ -100,13 +136,13 @@
         <td>{{ form.notes }}</td>
       </tr>
       {% if form.errors %}
-      <tr class="row-error"><td colspan="8" class="text-danger py-0"><strong>{% for errs in form.errors.values %}{{ errs|join:" " }} {% endfor %}</strong></td></tr>
+      <tr class="row-error"><td colspan="{% if has_animals %}8{% else %}7{% endif %}" class="text-danger py-0"><strong>{% for errs in form.errors.values %}{{ errs|join:" " }} {% endfor %}</strong></td></tr>
       {% endif %}
       {% endfor %}
       <tr id="empty-form-row" style="display:none">
         {{ formset.empty_form.id }}
         <td>{{ formset.empty_form.date }}</td>
-        <td>{{ formset.empty_form.animal }}</td>
+        {% if has_animals %}<td>{{ formset.empty_form.animal }}</td>{% endif %}
         <td>{{ formset.empty_form.item }}</td>
         <td>{{ formset.empty_form.behavior_goal }}</td>
         <td>{{ formset.empty_form.do_score }}</td>
@@ -125,6 +161,7 @@
   </span>
 </form>
 <form id="paste-form" method="post" action="{% url 'zoo:calendar_paste' asg.id year month %}">{% csrf_token %}</form>
+{% endif %}
 
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
