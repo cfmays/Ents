@@ -12,6 +12,14 @@
 </style>
 <h1>Item &harr; Calendar Assignments</h1>
 
+<h4>Filter the item lists</h4>
+<p class="text-muted small mb-1">Applies to both item lists below. An item must contain every box that has text. Items you have already picked stay in the list.</p>
+<p class="mb-1">Enter search text: <input type="text" id="search-1"></p>
+<p class="mb-1" id="row-2" style="display:none">and also (optional): <input type="text" id="search-2"></p>
+<p class="mb-1" id="row-3" style="display:none">and also (optional): <input type="text" id="search-3"></p>
+<p>Check to filter, uncheck to reset: <input type="checkbox" id="filter-on"></p>
+<hr>
+
 <h4>Look up an item's calendars</h4>
 <select id="lookup-item" class="form-control" style="max-width:400px;">
   <option value="">Choose an item&hellip;</option>
@@ -35,6 +43,61 @@
   // searchable, wrapping item list at about half the page width
   $("#id_items").select2({ width: "50%", placeholder: "Search and pick one or more items" });
 
+
+  // filter both item lists client-side; picked items are always kept
+  var allItems = $("#lookup-item option[value!='']").map(function () {
+    return { id: this.value, text: this.text };
+  }).get();
+
+  function rebuild($select, matches, keep, placeholder) {
+    $select.empty();
+    if (placeholder) { $select.append($("<option>").val("").text(placeholder)); }
+    matches.forEach(function (item) {
+      $select.append($("<option>").val(item.id).text(item.text).prop("selected", keep.indexOf(item.id) !== -1));
+    });
+  }
+
+  function applyFilter() {
+    var terms = ["#search-1", "#search-2", "#search-3"].map(function (id) {
+      return $(id).val().trim().toLowerCase();
+    }).filter(function (t) { return t; });
+    var filtering = $("#filter-on").prop("checked");
+
+    var pickedItems = $("#id_items").val() || [];
+    var pickedLookup = [$("#lookup-item").val() || ""];
+    function shown(keep) {
+      return allItems.filter(function (item) {
+        return !filtering || keep.indexOf(item.id) !== -1 ||
+          terms.every(function (t) { return item.text.toLowerCase().indexOf(t) !== -1; });
+      });
+    }
+
+    var forItems = shown(pickedItems);
+    rebuild($("#id_items"), forItems, pickedItems);
+    $("#id_items").trigger("change.select2");
+    $("label[for=id_items]").text("Items (" + forItems.length + (forItems.length === 1 ? " item" : " items") + "):");
+    rebuild($("#lookup-item"), shown(pickedLookup), pickedLookup, "Choose an item\u2026");
+  }
+
+  // the second and third boxes appear only once the one before them has text
+  function showBoxes() {
+    var t1 = $("#search-1").val().trim(), t2 = $("#search-2").val().trim(), t3 = $("#search-3").val().trim();
+    $("#row-2").toggle(!!(t1 || t2 || t3));
+    $("#row-3").toggle(!!(t2 || t3));
+  }
+  $("#search-1, #search-2, #search-3").on("input", showBoxes);
+
+  $("#filter-on").change(applyFilter);
+  $("#search-1, #search-2, #search-3").on("change", function () {
+    if ($("#filter-on").prop("checked")) { applyFilter(); }
+  }).on("keydown", function (event) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      $("#filter-on").prop("checked", true);
+      applyFilter();
+    }
+  });
+  $("label[for=id_items]").text("Items (" + allItems.length + " items):");
 
   $("#lookup-item").change(function () {
     var itemId = $(this).val();

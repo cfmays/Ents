@@ -69,6 +69,15 @@
 
     $("#id_doSearch").change(runSearch);
 
+    // the second and third boxes appear only once the one before them has text
+    function showBoxes() {
+      var t1 = $("#id_searchString").val().trim(), t2 = $("#id_searchString2").val().trim(), t3 = $("#id_searchString3").val().trim();
+      $("#id_searchString2").closest("p").toggle(!!(t1 || t2 || t3));
+      $("#id_searchString3").closest("p").toggle(!!(t2 || t3));
+    }
+    $("#id_searchString, #id_searchString2, #id_searchString3").on("input", showBoxes);
+    showBoxes();
+
     // editing a search string while filtering is on updates the list; Enter turns filtering on
     $("#id_searchString, #id_searchString2, #id_searchString3").on("change", function () {
       if ($("#id_doSearch").prop("checked")) { runSearch(); }
