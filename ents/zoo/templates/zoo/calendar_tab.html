@@ -38,6 +38,7 @@
   <h1 class="mb-0">{{ asg.name }} &mdash; {{ month_name }}</h1>
   <a class="btn btn-outline-secondary btn-sm" href="{% url 'zoo:calendar_tab' asg.id prev_year prev_month %}">&laquo; Previous month</a>
   <a class="btn btn-outline-secondary btn-sm" href="{% url 'zoo:calendar_tab' asg.id next_year next_month %}">Next month &raquo;</a>
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'zoo:calendar_print' asg.id year month %}" target="_blank" title="Prints the saved entries">Print</a>
 </div>
 <p class="mt-2">
   <a href="{% url 'zoo:list_management_tab' asg.id %}">List management</a> |

@@ -8,6 +8,7 @@ urlpatterns = [
     path('', views.asg_list, name='asg_list'),
     path('asg/<int:asg_id>/calendar/', views.calendar_tab, name='calendar_tab'),
     path('asg/<int:asg_id>/calendar/<int:year>/<int:month>/', views.calendar_tab, name='calendar_tab'),
+    path('asg/<int:asg_id>/calendar/<int:year>/<int:month>/print/', views.calendar_print, name='calendar_print'),
     path('asg/<int:asg_id>/calendar/<int:year>/<int:month>/copy/', views.calendar_copy, name='calendar_copy'),
     path('asg/<int:asg_id>/calendar/<int:year>/<int:month>/paste/', views.calendar_paste, name='calendar_paste'),
     path('asg/<int:asg_id>/list/', views.list_management_tab, name='list_management_tab'),

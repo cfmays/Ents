@@ -182,6 +182,22 @@ class KeeperAccessScopingTests(TestCase):
         response = self.client.post(reverse('zoo:calendar_tab', args=[self.asg.id]), data)
         self.assertContains(response, 'Please choose an enrichment item.')
 
+    def test_print_view_has_entries_but_not_score_or_note_columns(self):
+        item = Enrichment.objects.create(name='Ball', photo=make_image_file(name='ball.png'))
+        ASGApprovedItem.objects.create(asg=self.asg, item=item, comments='Stays up')
+        CalendarEntry.objects.create(asg=self.asg, date='2026-09-03', item=item, do_score=3, notes='secret keeper note')
+        url = reverse('zoo:calendar_print', args=[self.asg.id, 2026, 9])
+
+        self.client.force_login(self.assigned_keeper)
+        response = self.client.get(url)
+        self.assertContains(response, 'Ball **Stays up')
+        self.assertContains(response, 'Enrichment item')
+        for hidden in ('>DO<', '>IO<', '>GBS<', '>Notes<', 'secret keeper note'):
+            self.assertNotContains(response, hidden)
+
+        self.client.force_login(self.unassigned_keeper)
+        self.assertEqual(self.client.get(url).status_code, 403)
+
     def test_saving_a_date_outside_the_month_shows_an_error(self):
         item = Enrichment.objects.create(name='Ball', photo=make_image_file(name='ball.png'))
         ASGApprovedItem.objects.create(asg=self.asg, item=item)

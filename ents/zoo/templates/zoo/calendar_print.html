@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{{ asg.name }} &mdash; {{ month_name }}</title>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 13px; margin: 20px; color: #000; }
+    h1 { font-size: 22px; margin: 0 0 8px; }
+    .concerns { border: 2px solid #000; padding: 6px 12px; margin: 10px 0; font-weight: bold; }
+    .concerns ul { margin: 0; padding-left: 18px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    th, td { border: 1px solid #555; padding: 4px 6px; text-align: left; vertical-align: middle; }
+    th { background: #eee; }
+    tr { page-break-inside: avoid; }
+    .item { display: flex; align-items: center; gap: 8px; }
+    .item img { height: 40px; width: 40px; object-fit: cover; flex-shrink: 0; }
+    .screen-only { margin-bottom: 12px; }
+    @media print { .screen-only { display: none; } body { margin: 0; } }
+  </style>
+</head>
+<body>
+  <div class="screen-only">
+    <button onclick="window.print()">Print</button>
+    <a href="{% url 'zoo:calendar_tab' asg.id year month %}">Back to calendar</a>
+    &middot; Only saved entries are printed.
+  </div>
+
+  <h1>{{ asg.name }} &mdash; {{ month_name }}</h1>
+
+  {% if asg.special_concerns.all %}
+  <div class="concerns">
+    <ul>{% for concern in asg.special_concerns.all %}<li>{{ concern.text }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+  {% if asg.notes %}<p><strong>Notes:</strong> {{ asg.notes }}</p>{% endif %}
+
+  <table>
+    <thead>
+      <tr><th style="width:80px">Date</th><th>Animal</th><th>Enrichment item</th><th>Behavior goal</th></tr>
+    </thead>
+    <tbody>
+      {% for entry, label in rows %}
+      <tr>
+        <td>{{ entry.date|date:"D n/j" }}</td>
+        <td>{{ entry.animal|default:"" }}</td>
+        <td>
+          <div class="item">
+            {% if entry.item.photo %}<img src="{{ entry.item.photo.url }}" alt="">{% endif %}
+            <span>{{ label }}</span>
+          </div>
+        </td>
+        <td>{{ entry.behavior_goal|default:"" }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="4"><em>No saved entries for {{ month_name }}.</em></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <script>window.addEventListener("load", function () { if (document.querySelector("tbody tr td:not([colspan])")) { window.print(); } });</script>
+</body>
+</html>

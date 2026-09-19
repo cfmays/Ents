@@ -13,7 +13,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
-from .forms import AddAnimalChoiceForm, AddBehaviorGoalForm, ItemAssignmentForm, TrainingSessionForm, TrainingStringForm, make_calendar_entry_formset
+from .forms import item_labels_for, AddAnimalChoiceForm, AddBehaviorGoalForm, ItemAssignmentForm, TrainingSessionForm, TrainingStringForm, make_calendar_entry_formset
 from ents.models import Enrichment
 from .models import Division, Behavior, Reinforcer, ASG, ASGApprovedItem, Animal, default_is_food, BehaviorGoal, BehaviorScore, CalendarEntry, Profile, SpecialConcern, String, TrainingAnimal, TrainingSession
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -102,6 +102,23 @@ def _entries(n):
 
 def _month_label(year, month):
     return date(year, month, 1).strftime('%B %Y')
+
+
+@login_required
+def calendar_print(request, asg_id, year, month):
+    """Printable copy of a month's saved entries (no DO/IO/GBS/Notes columns)."""
+    asg = _get_accessible_asg(request, asg_id)
+    entries = CalendarEntry.objects.filter(asg=asg, date__year=year, date__month=month).select_related(
+        'item', 'animal', 'behavior_goal',
+    )
+    labels = item_labels_for(asg)
+    return render(request, 'zoo/calendar_print.html', {
+        'asg': asg,
+        'month_name': _month_label(year, month),
+        'rows': [(entry, labels.get(entry.item_id, entry.item.name)) for entry in entries],
+        'year': year,
+        'month': month,
+    })
 
 
 @login_required
