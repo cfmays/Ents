@@ -305,6 +305,7 @@ class KeeperAccessScopingTests(TestCase):
         response = self.client.get(url)
         self.assertContains(response, 'Approved non-food enrichment')
         self.assertContains(response, 'Approved food enrichment')
+        self.assertContains(response, '1 item<')  # one item in each column
 
         self.client.post(url, {'remove_item': nonfood.id})
         self.assertEqual(rows.count(), 1)

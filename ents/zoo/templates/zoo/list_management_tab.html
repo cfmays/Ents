@@ -98,7 +98,7 @@
 <div class="row mt-4">
   {% for title, kind, choices, assignments in columns %}
   <div class="col-md-6">
-    <h4>{{ title }}</h4>
+    <h4>{{ title }} <span class="text-muted" style="font-size:0.9rem; font-weight:normal; margin-left:8px">{{ assignments|length }} item{{ assignments|length|pluralize }}</span></h4>
     {% if can_edit_lists %}
     <form method="post" class="mb-3 p-2 border rounded">
       {% csrf_token %}
