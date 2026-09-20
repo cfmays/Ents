@@ -145,6 +145,18 @@ def calendar_print(request, asg_id, year, month):
     })
 
 
+@supervisor_required
+def list_management_print(request, asg_id):
+    """Printable copy of a calendar list: animals, special concerns, behavior goals and approved items."""
+    asg = _get_accessible_asg(request, asg_id)
+    assignments = ASGApprovedItem.objects.filter(asg=asg).select_related('item')
+    return render(request, 'zoo/list_management_print.html', {
+        'asg': asg,
+        'non_food_items': assignments.filter(is_food=False),
+        'food_items': assignments.filter(is_food=True),
+    })
+
+
 @login_required
 @require_POST
 def calendar_copy(request, asg_id, year, month):

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{{ asg.name }} &mdash; Calendar List</title>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 13px; margin: 20px; color: #000; }
+    h1 { font-size: 22px; margin: 0 0 8px; }
+    h2 { font-size: 16px; margin: 18px 0 6px; }
+    .concerns { border: 2px solid #000; padding: 6px 12px; font-weight: bold; }
+    ul { margin: 0; padding-left: 18px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #555; padding: 4px 6px; text-align: left; vertical-align: middle; }
+    th { background: #eee; }
+    tr { page-break-inside: avoid; }
+    .item { display: flex; align-items: center; gap: 8px; }
+    .item img { height: 40px; width: 40px; object-fit: cover; flex-shrink: 0; }
+    .screen-only { margin-bottom: 12px; }
+    @media print { .screen-only { display: none; } body { margin: 0; } }
+  </style>
+</head>
+<body>
+  <div class="screen-only">
+    <button onclick="window.print()">Print</button>
+    <a href="{% url 'zoo:list_management_tab' asg.id %}">Back to list management</a>
+  </div>
+
+  <h1>{{ asg.name }} &mdash; Calendar List</h1>
+
+  {% if asg.animals.all %}
+  <h2>Animals</h2>
+  <ul>{% for animal in asg.animals.all %}<li>{{ animal.name }}</li>{% endfor %}</ul>
+  {% endif %}
+
+  {% if asg.special_concerns.all %}
+  <h2>Special concerns</h2>
+  <div class="concerns"><ul>{% for concern in asg.special_concerns.all %}<li>{{ concern.text }}</li>{% endfor %}</ul></div>
+  {% endif %}
+
+  {% if asg.notes %}<p><strong>Notes:</strong> {{ asg.notes }}</p>{% endif %}
+
+  {% if asg.behavior_goals.all %}
+  <h2>Behavior goals</h2>
+  <ul>{% for goal in asg.behavior_goals.all %}<li>{{ goal.name }}</li>{% endfor %}</ul>
+  {% endif %}
+
+  <h2>Approved non-food enrichment ({{ non_food_items|length }})</h2>
+  {% include "zoo/_print_items.html" with assignments=non_food_items %}
+
+  <h2>Approved food enrichment ({{ food_items|length }})</h2>
+  {% include "zoo/_print_items.html" with assignments=food_items %}
+
+  <script>window.addEventListener("load", function () { window.print(); });</script>
+</body>
+</html>

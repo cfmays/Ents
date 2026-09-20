@@ -1,0 +1,19 @@
+<table>
+  <thead><tr><th>Item</th><th>Comments</th><th style="width:50px">Rate</th></tr></thead>
+  <tbody>
+    {% for assignment in assignments %}
+    <tr>
+      <td>
+        <div class="item">
+          {% if assignment.item.photo %}<img src="{{ assignment.item.photo.url }}" alt="">{% endif %}
+          <span>{{ assignment.item.name }}</span>
+        </div>
+      </td>
+      <td>{{ assignment.comments }}</td>
+      <td>{{ assignment.rate }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="3"><em>None</em></td></tr>
+    {% endfor %}
+  </tbody>
+</table>

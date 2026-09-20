@@ -479,6 +479,23 @@ class KeeperAccessScopingTests(TestCase):
         self.assertContains(self.client.get(reverse('zoo:asg_list')), 'List management')
         self.assertEqual(self.client.get(url).status_code, 200)
 
+    def test_list_management_print_page_for_supervisors_only(self):
+        item = Enrichment.objects.create(name='Ball', photo=make_image_file(name='ball.png'))
+        ASGApprovedItem.objects.create(asg=self.asg, item=item, comments='Stays up')
+        food = Enrichment.objects.create(name='Grapes', photo=make_image_file(name='g.png'))
+        ASGApprovedItem.objects.create(asg=self.asg, item=food, is_food=True)
+        url = reverse('zoo:list_management_print', args=[self.asg.id])
+
+        self.client.force_login(self.assigned_keeper)
+        self.assertEqual(self.client.get(url).status_code, 403)
+
+        self.client.force_login(self.matching_supervisor)
+        self.assertContains(self.client.get(reverse('zoo:list_management_tab', args=[self.asg.id])), url)  # Print link
+        page = self.client.get(url)
+        self.assertContains(page, 'Approved non-food enrichment (1)')
+        self.assertContains(page, 'Approved food enrichment (1)')
+        self.assertContains(page, 'Stays up')
+
     def test_supervisor_can_add_and_remove_animal_choice(self):
         self.client.force_login(self.matching_supervisor)
         url = reverse('zoo:list_management_tab', args=[self.asg.id])
