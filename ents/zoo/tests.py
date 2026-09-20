@@ -247,6 +247,11 @@ class KeeperAccessScopingTests(TestCase):
         response = self.client.post(reverse('zoo:calendar_tab', args=[self.asg.id]), data)
         self.assertContains(response, 'Please choose an enrichment item.')
 
+    def test_calendar_page_warns_before_leaving_with_unsaved_changes(self):
+        self.client.force_login(self.assigned_keeper)
+        page = self.client.get(reverse('zoo:calendar_tab', args=[self.asg.id]))
+        self.assertContains(page, 'beforeunload')
+
     def test_calendar_page_is_not_cached_by_the_browser(self):
         self.client.force_login(self.assigned_keeper)
         response = self.client.get(reverse('zoo:calendar_tab', args=[self.asg.id]))

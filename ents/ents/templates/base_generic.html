@@ -47,14 +47,14 @@
           <li class="nav-item">
             <a class="nav-link" href="{% url 'zoo:asg_list' %}">Enrichment Calendars</a>
           </li>
-          <li class="nav-item">
-            <a class="nav-link" href="{% url 'zoo:training_start' %}">Training Log</a>
-          </li>
           {% if user|is_supervisor %}
           <li class="nav-item">
             <a class="nav-link" href="{% url 'zoo:item_assignment' %}">Item Assignments</a>
           </li>
           {% endif %}
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'zoo:training_start' %}">Training Log</a>
+          </li>
           <li class="nav-item">
             <a class="nav-link" href="{% url 'logout' %}">Log Out</a>
           </li>

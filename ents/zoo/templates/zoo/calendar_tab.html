@@ -251,6 +251,14 @@
   var unsaved = false;
   $("#calendar-form").on("input change", function () { unsaved = true; }).on("submit", function () { unsaved = false; });
 
+  // Unlike the Google sheet, changes here are saved with the button: warn before leaving with unsaved changes
+  window.addEventListener("beforeunload", function (event) {
+    if (unsaved) {
+      event.preventDefault();
+      event.returnValue = "";  // browsers show their own "Leave site? Changes may not be saved" prompt
+    }
+  });
+
   $("#print-link").click(function (event) {
     if (!unsaved) { return; }
     event.preventDefault();
