@@ -479,6 +479,15 @@ class KeeperAccessScopingTests(TestCase):
         self.assertContains(self.client.get(reverse('zoo:asg_list')), 'List management')
         self.assertEqual(self.client.get(url).status_code, 200)
 
+    def test_list_management_photos_open_in_an_overlay(self):
+        item = Enrichment.objects.create(name='Ball', photo=make_image_file(name='ball.png'))
+        ASGApprovedItem.objects.create(asg=self.asg, item=item, comments='Stays up')
+        self.client.force_login(self.matching_supervisor)
+        page = self.client.get(reverse('zoo:list_management_tab', args=[self.asg.id]))
+        self.assertContains(page, 'id="photo-overlay"')
+        self.assertContains(page, 'class="row-photo"')
+        self.assertContains(page, 'data-caption="Ball **Stays up"')
+
     def test_list_management_print_page_for_supervisors_only(self):
         item = Enrichment.objects.create(name='Ball', photo=make_image_file(name='ball.png'))
         ASGApprovedItem.objects.create(asg=self.asg, item=item, comments='Stays up')
@@ -524,14 +533,14 @@ class SupervisorPermissionTests(TestCase):
         self.supervisor.groups.add(supervisor_group)
         self.supervisor.profile.divisions.add(self.division)
 
-    def test_keeper_cannot_reach_item_assignment_view(self):
+    def test_keeper_cannot_reach_manage_items(self):
         self.client.force_login(self.keeper)
-        response = self.client.get(reverse('zoo:item_assignment'))
+        response = self.client.get(reverse('createView'))
         self.assertEqual(response.status_code, 403)
 
-    def test_supervisor_can_reach_item_assignment_view(self):
+    def test_supervisor_can_reach_manage_items(self):
         self.client.force_login(self.supervisor)
-        response = self.client.get(reverse('zoo:item_assignment'))
+        response = self.client.get(reverse('createView'))
         self.assertEqual(response.status_code, 200)
 
     def test_supervisor_bulk_assign_creates_asg_approved_items(self):
@@ -541,7 +550,8 @@ class SupervisorPermissionTests(TestCase):
         item = Enrichment.objects.create(name='Ball', photo=make_image_file(name='ball.png'))
 
         self.client.force_login(self.supervisor)
-        response = self.client.post(reverse('zoo:item_assignment'), {
+        response = self.client.post(reverse('createView'), {
+            'action': 'add_to_lists',
             'items': [item.id],
             'asgs': [asg1.id, asg2.id],
         })
@@ -572,13 +582,19 @@ class SupervisorPermissionTests(TestCase):
         self.client.force_login(self.keeper)
         self.assertEqual(self.client.post(url, {'item_id': item.id}).status_code, 403)
 
-    def test_item_assignment_page_says_calendar_list(self):
+    def test_manage_items_page_holds_the_calendar_list_functions(self):
         self.client.force_login(self.supervisor)
-        page = self.client.get(reverse('zoo:item_assignment'))
-        self.assertContains(page, 'Calendar List Assignments')
+        page = self.client.get(reverse('createView'))
         self.assertContains(page, "Look up an item's calendar lists")
         self.assertContains(page, 'Remove from all calendar lists')
-        self.assertNotContains(page, "item's calendars")
+        self.assertContains(page, 'Add item(s) to calendar list(s)')
+        self.assertContains(page, 'id="search-3"')
+        self.assertNotContains(page, 'Item Assignments')  # the separate page is gone
+
+    def test_item_assignments_page_and_menu_link_are_gone(self):
+        self.client.force_login(self.supervisor)
+        self.assertEqual(self.client.get('/zoo/supervisor/items/').status_code, 404)
+        self.assertNotContains(self.client.get(reverse('zoo:asg_list')), 'Item Assignments')
 
     def test_supervisor_cannot_assign_items_to_other_divisions_asg(self):
         other_division = Division.objects.create(name='Aquatic')
@@ -587,7 +603,8 @@ class SupervisorPermissionTests(TestCase):
         item = Enrichment.objects.create(name='Ball', photo=make_image_file(name='ball.png'))
 
         self.client.force_login(self.supervisor)
-        response = self.client.post(reverse('zoo:item_assignment'), {
+        response = self.client.post(reverse('createView'), {
+            'action': 'add_to_lists',
             'items': [item.id],
             'asgs': [other_asg.id],
         })
@@ -796,14 +813,14 @@ class WorkingDivisionTests(TestCase):
         self.assertContains(response, 'Keep at least one division ticked.')
         self.assertNotContains(self.client.get(reverse('zoo:asg_list')), 'Tiger String')  # still just Aquatic
 
-    def test_superuser_filter_and_item_assignment_scope(self):
+    def test_superuser_filter_and_manage_items_scope(self):
         self.client.force_login(self.root)
         self.pick(self.aquatic)
         page = self.client.get(reverse('zoo:asg_list'))
         self.assertNotContains(page, 'Tiger String')
-        assignment_page = self.client.get(reverse('zoo:item_assignment'))
-        self.assertContains(assignment_page, 'Penguins')
-        self.assertNotContains(assignment_page, '>Tiger<')
+        manage_page = self.client.get(reverse('createView'))
+        self.assertContains(manage_page, 'Penguins')
+        self.assertNotContains(manage_page, '>Tiger<')
 
     def test_cannot_pick_a_division_you_do_not_have_or_redirect_off_site(self):
         self.client.force_login(self.one)

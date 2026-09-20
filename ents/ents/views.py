@@ -8,7 +8,9 @@ from django.http import HttpResponseRedirect
 from django.urls import reverse
 from .forms import CreateEnrichmentForm, ItemPhotoForm, enrichment_items_form
 from .settings import MEDIA_URL
-from zoo.permissions import supervisor_required
+from zoo.forms import ItemAssignmentForm
+from zoo.models import ASGApprovedItem, default_is_food
+from zoo.permissions import division_scope, supervisor_required
 
 
 def count_text(n):
@@ -71,8 +73,24 @@ def EnrichmentUploadView(request):
     """Manage Items: pick an existing item to rename / re-photo / delete, or upload a new one."""
     item = Enrichment.objects.filter(pk=request.GET.get('item') or request.POST.get('item') or None).first()
     action = request.POST.get('action')
+    assign_form = ItemAssignmentForm(divisions=division_scope(request))
     if request.method == 'POST' and action in ('rename', 'photo', 'delete'):
         return _manage_item(request, item, action)
+    if request.method == 'POST' and action == 'add_to_lists':
+        assign_form = ItemAssignmentForm(request.POST, divisions=division_scope(request))
+        if assign_form.is_valid():
+            created = 0
+            for chosen in assign_form.cleaned_data['items']:
+                for asg in assign_form.cleaned_data['asgs']:
+                    _, was_created = ASGApprovedItem.objects.get_or_create(asg=asg, item=chosen, is_food=default_is_food(chosen))
+                    created += int(was_created)
+            messages.success(request, f'Created {created} new item/calendar list assignment(s).')
+            return HttpResponseRedirect(reverse('createView'))
+        form = CreateEnrichmentForm()
+        return render(request, 'createEnrichment.html', {
+            'form': form, 'item': item, 'items': Enrichment.objects.all(), 'calendars': 0, 'entries': 0,
+            'assign_form': assign_form,
+        })
 
     if request.method == 'POST':
         form = CreateEnrichmentForm(request.POST, request.FILES)
@@ -92,6 +110,7 @@ def EnrichmentUploadView(request):
         'items': Enrichment.objects.all(),
         'calendars': calendars,
         'entries': entries,
+        'assign_form': assign_form,
     })
 
 def logout_view(request):

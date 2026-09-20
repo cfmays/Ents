@@ -9,22 +9,26 @@
   .select2-selection--single .select2-selection__arrow { height: 60px !important; }
   .manage-panel { border: 1px solid #c9bd9c; border-radius: 6px; background: #f8f0d8; padding: 12px 16px; margin: 12px 0; }
   .manage-panel form { margin-bottom: 10px; }
+  .select2-selection--multiple .select2-selection__choice { white-space: normal; overflow-wrap: anywhere; max-width: 100%; }
+  .select2-selection--multiple .select2-selection__choice__display { white-space: normal; text-overflow: clip; overflow: visible; }
+  .select2-selection--multiple .select2-search__field { font-size: 14px !important; height: 28px !important; line-height: 28px !important; margin-top: 0 !important; }
   /* "No file chosen" in light gray; the button keeps its normal look and a chosen file name is normal text */
   input[type=file].no-file { color: #aaa; }
   input[type=file].no-file::file-selector-button { color: #212529; }
 </style>
 
 <h1>Manage Items</h1>
-<p>
-  <a href="{% url 'zoo:item_assignment' %}">Item Assignments</a> |
-  <a href="{% url 'index' %}">Back to Enrichment Items</a>
-</p>
+<p><a href="{% url 'index' %}">Back to Enrichment Items</a></p>
 
-<h4 id="pick-heading">Select an existing item</h4>
+<h4>Filter the item lists</h4>
+<p class="text-muted small mb-1">Applies to every item list on this page. An item must contain every box that has text. The item you have chosen or picked stays in its list.</p>
 <p class="mb-1">Enter search text: <input type="text" id="search-1"></p>
 <p class="mb-1" id="row-2" style="display:none">and also (optional): <input type="text" id="search-2"></p>
 <p class="mb-1" id="row-3" style="display:none">and also (optional): <input type="text" id="search-3"></p>
 <p>Check to filter, uncheck to reset: <input type="checkbox" id="filter-on"></p>
+<hr>
+
+<h4 id="pick-heading">Select an existing item</h4>
 <select id="pick-item" style="width:100%; max-width:700px">
   <option value="">Choose an item&hellip; (type to search)</option>
   {% for i in items %}<option value="{{ i.id }}"{% if i.photo %} data-thumb="{{ i.photo.url }}"{% endif %}{% if item and i.id == item.id %} selected{% endif %}>{{ i.name }}</option>{% endfor %}
@@ -80,6 +84,24 @@
   <input type="submit" value="Add new item">
 </form>
 
+<hr>
+<h4>Look up an item's calendar lists</h4>
+<select id="lookup-item" class="form-control" style="max-width:400px;">
+  <option value="">Choose an item&hellip;</option>
+  {% for i in items %}<option value="{{ i.id }}">{{ i.name }}</option>{% endfor %}
+</select>
+<p id="remove-all-wrap" class="mt-2 mb-1" style="display:none"><a href="#" id="remove-all" class="text-danger">Remove from all calendar lists</a></p>
+<ul id="lookup-result" class="mt-1"></ul>
+
+<hr>
+<h4>Add item(s) to calendar list(s)</h4>
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="add_to_lists">
+  {{ assign_form.as_p }}
+  <button type="submit" class="btn btn-primary">Add item(s)</button>
+</form>
+
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
   function thumbFormatter(size) {
@@ -94,29 +116,56 @@
   }
   $("#pick-item").select2({ width: "100%", templateResult: thumbFormatter(56), templateSelection: thumbFormatter(50) });
 
-  // filter the item list by up to three search strings (an item must contain all of them); the chosen item always stays
+  // searchable, wrapping multi-select for adding items to calendar lists
+  $("#id_items").select2({ width: "50%", placeholder: "Search and pick one or more items" });
+  $("label[for=id_items]").text("Items (" + $("#id_items option").length + " items):");
+
+  // filter every item list by up to three search strings (an item must contain all of them); chosen/picked items stay
   var allItems = $("#pick-item option[value!='']").map(function () {
     return { id: this.value, text: this.text, thumb: $(this).data("thumb") || "" };
   }).get();
+
+  function matching(terms, filtering, keep) {
+    return allItems.filter(function (item) {
+      return !filtering || keep.indexOf(item.id) !== -1 ||
+        terms.every(function (t) { return item.text.toLowerCase().indexOf(t) !== -1; });
+    });
+  }
 
   function applyFilter() {
     var terms = ["#search-1", "#search-2", "#search-3"].map(function (id) {
       return $(id).val().trim().toLowerCase();
     }).filter(function (t) { return t; });
     var filtering = $("#filter-on").prop("checked");
+
+    // the item picker (keeps thumbnails)
     var chosen = $("#pick-item").val();
-    var shown = allItems.filter(function (item) {
-      return !filtering || item.id === chosen ||
-        terms.every(function (t) { return item.text.toLowerCase().indexOf(t) !== -1; });
-    });
+    var forPick = matching(terms, filtering, [chosen]);
     var $pick = $("#pick-item").empty().append($("<option>").val("").text("Choose an item\u2026 (type to search)"));
-    shown.forEach(function (item) {
+    forPick.forEach(function (item) {
       var $o = $("<option>").val(item.id).text(item.text).prop("selected", item.id === chosen);
       if (item.thumb) { $o.attr("data-thumb", item.thumb); }
       $pick.append($o);
     });
     $pick.trigger("change.select2");   // refresh the dropdown without navigating
-    $("#pick-heading").text("Select an existing item (" + shown.length + (shown.length === 1 ? " item" : " items") + ")");
+    $("#pick-heading").text("Select an existing item (" + forPick.length + (forPick.length === 1 ? " item" : " items") + ")");
+
+    // the calendar-list lookup
+    var looked = $("#lookup-item").val();
+    var $lookup = $("#lookup-item").empty().append($("<option>").val("").text("Choose an item\u2026"));
+    matching(terms, filtering, [looked]).forEach(function (item) {
+      $lookup.append($("<option>").val(item.id).text(item.text).prop("selected", item.id === looked));
+    });
+
+    // the "add to calendar lists" multi-select (picked items stay)
+    var picked = $("#id_items").val() || [];
+    var forAdd = matching(terms, filtering, picked);
+    var $add = $("#id_items").empty();
+    forAdd.forEach(function (item) {
+      $add.append($("<option>").val(item.id).text(item.text).prop("selected", picked.indexOf(item.id) !== -1));
+    });
+    $add.trigger("change.select2");
+    $("label[for=id_items]").text("Items (" + forAdd.length + (forAdd.length === 1 ? " item" : " items") + "):");
   }
 
   // the second and third boxes appear only once the one before them has text
@@ -140,6 +189,62 @@
   // gray text while no file is chosen
   $("input[type=file]").each(function () { $(this).toggleClass("no-file", !this.files.length); })
     .on("change", function () { $(this).toggleClass("no-file", !this.files.length); });
+
+  // look up the calendar lists an item is on, with links to remove it from one or all of them
+  function loadLookup() {
+    var itemId = $("#lookup-item").val();
+    var resultEl = $("#lookup-result").empty();
+    $("#remove-all-wrap").hide();
+    if (!itemId) { return; }
+    $.ajax({
+      url: "{% url 'zoo:item_ajax_asgs_for_item' %}",
+      data: {'item_id': itemId},
+      success: function (data) {
+        if (!data.asgs.length) {
+          resultEl.append("<li><em>Not assigned to any calendar list yet.</em></li>");
+          return;
+        }
+        $("#remove-all-wrap").show();
+        data.asgs.forEach(function (asg) {
+          var $li = $("<li>").text(asg.name + " ");
+          $("<a>").attr("href", "#").addClass("remove-one text-danger small").data("asg", asg.id).data("name", asg.name)
+            .text("Remove").appendTo($li);
+          resultEl.append($li);
+        });
+      }
+    });
+  }
+
+  function removeFromLists(asgId, question) {
+    if (!confirm(question)) { return; }
+    var data = {item_id: $("#lookup-item").val(), csrfmiddlewaretoken: $("input[name=csrfmiddlewaretoken]").first().val()};
+    if (asgId) { data.asg_id = asgId; }
+    $.post("{% url 'zoo:item_remove_from_asgs' %}", data, loadLookup);
+  }
+
+  $("#lookup-item").change(loadLookup);
+  $("#remove-all").click(function (event) {
+    event.preventDefault();
+    removeFromLists(null, "Remove " + $("#lookup-item option:selected").text() + " from ALL of its calendar lists?");
+  });
+  $("#lookup-result").on("click", "a.remove-one", function (event) {
+    event.preventDefault();
+    removeFromLists($(this).data("asg"), "Remove " + $("#lookup-item option:selected").text() + " from the " + $(this).data("name") + " calendar list?");
+  });
+
+  // keep the page where it was after any change on this long page
+  document.querySelectorAll("form").forEach(function (form) {
+    form.addEventListener("submit", function () {
+      try { sessionStorage.setItem("manageScroll", String(window.scrollY)); } catch (e) {}
+    });
+  });
+  try {
+    var savedScroll = sessionStorage.getItem("manageScroll");
+    if (savedScroll !== null) {
+      sessionStorage.removeItem("manageScroll");
+      window.addEventListener("load", function () { window.scrollTo({ top: parseInt(savedScroll, 10), behavior: "instant" }); });
+    }
+  } catch (e) {}
 
   // choosing an item reloads this page with that item's options
   $("#pick-item").on("change", function () {

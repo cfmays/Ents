@@ -22,7 +22,6 @@ urlpatterns = [
     path('training/animal/<int:animal_id>/', views.training_entry, name='training_entry'),
     path('training/animal/<int:animal_id>/history/', views.training_history, name='training_history'),
 
-    path('supervisor/items/', views.item_assignment_view, name='item_assignment'),
     path('supervisor/items/remove_from_asgs/', views.item_remove_from_asgs, name='item_remove_from_asgs'),
     path('supervisor/items/ajax_asgs_for_item/', views.item_ajax_asgs_for_item, name='item_ajax_asgs_for_item'),
 ]

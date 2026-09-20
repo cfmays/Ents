@@ -85,10 +85,23 @@
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css">
 <style>
-  .item-pick-dropdown .select2-results__option { white-space: normal; }
+  .item-pick-dropdown .select2-results__option { white-space: normal; min-height: 50px; display: flex; align-items: center; }
+  .item-pick-dropdown .select2-results__options { max-height: 400px !important; }
+  /* closed box tall enough for the 40px thumbnail */
+  .item-pick-box .select2-selection--single { height: 52px !important; }
+  .item-pick-box .select2-selection--single .select2-selection__rendered { line-height: 1.2 !important; min-height: 50px; display: flex; align-items: center; }
+  .item-pick-box .select2-selection--single .select2-selection__arrow { height: 52px !important; }
   .item-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid #d8ccae; }
   .item-row .item-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  /* click a photo to see it full size */
+  img.row-photo { cursor: zoom-in; }
+  #photo-overlay { display: none; position: fixed; inset: 0; z-index: 3000; background: rgba(0,0,0,.8); cursor: zoom-out;
+                   flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+  #photo-overlay img { max-width: 92vw; max-height: 80vh; background: #fff; border-radius: 6px; }
+  #photo-overlay div { color: #fff; margin-top: 12px; max-width: 80vw; text-align: center; font-size: 16px; overflow-wrap: anywhere; }
 </style>
+
+<div id="photo-overlay" title="Click or press Esc to close"><img alt=""><div></div></div>
 
 <div class="row mt-4">
   {% for title, kind, choices, assignments in columns %}
@@ -112,7 +125,7 @@
     {% for assignment in assignments %}
     <div class="item-row">
       {% if assignment.item.photo %}
-      <img src="{{ assignment.item.photo.url }}" style="height:50px;width:50px;flex-shrink:0;object-fit:cover;border-radius:4px;">
+      <img class="row-photo" src="{{ assignment.item.photo.url }}" data-caption="{{ assignment.item.name }}{% if assignment.comments %} **{{ assignment.comments }}{% endif %}" title="Click to see the photo full size" style="height:50px;width:50px;flex-shrink:0;object-fit:cover;border-radius:4px;">
       {% else %}
       <div style="height:50px;width:50px;flex-shrink:0;background:#ddd;border-radius:4px;"></div>
       {% endif %}
@@ -146,9 +159,23 @@
       '" style="height:40px;width:40px;flex-shrink:0;object-fit:cover;border-radius:4px;margin-right:8px;"><span class="item-label"></span></span>')
       .find(".item-label").text(item.text).end();
   }
-  $(".item-pick").select2({ width: "100%", templateResult: formatItem, templateSelection: formatItem }).on("select2:open", function () {
+  $(".item-pick").select2({ width: "100%", templateResult: formatItem, templateSelection: formatItem }).each(function () {
+    $(this).data("select2").$container.addClass("item-pick-box");
+  }).on("select2:open", function () {
     $(this).data("select2").$dropdown.addClass("item-pick-dropdown");
   });
+</script>
+
+<script>
+  // click an item's photo to see it full size, captioned with its name and note
+  function closePhoto() { $("#photo-overlay").hide(); }
+  $(document).on("click", "img.row-photo", function () {
+    $("#photo-overlay img").attr("src", this.src);
+    $("#photo-overlay div").text($(this).data("caption"));
+    $("#photo-overlay").css("display", "flex");
+  });
+  $("#photo-overlay").click(closePhoto);
+  $(document).on("keydown", function (event) { if (event.key === "Escape") { closePhoto(); } });
 </script>
 
 <script>

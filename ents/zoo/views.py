@@ -424,24 +424,6 @@ def training_entry(request, animal_id):
 
 
 @supervisor_required
-def item_assignment_view(request):
-    if request.method == 'POST':
-        form = ItemAssignmentForm(request.POST, divisions=division_scope(request))
-        if form.is_valid():
-            created = 0
-            for item in form.cleaned_data['items']:
-                for asg in form.cleaned_data['asgs']:
-                    _, was_created = ASGApprovedItem.objects.get_or_create(asg=asg, item=item, is_food=default_is_food(item))
-                    created += int(was_created)
-            messages.success(request, f'Created {created} new item/calendar list assignment(s).')
-            return redirect('zoo:item_assignment')
-    else:
-        form = ItemAssignmentForm(divisions=division_scope(request))
-
-    return render(request, 'zoo/item_assignment.html', {'form': form})
-
-
-@supervisor_required
 def item_ajax_asgs_for_item(request):
     item_id = request.GET.get('item_id')
     asgs = ASG.objects.filter(item_assignments__item_id=item_id) if item_id else ASG.objects.none()

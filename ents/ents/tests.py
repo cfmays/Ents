@@ -169,7 +169,6 @@ class ManageItemsTests(TestCase):
         self.assertContains(page, 'Change name')
         self.assertContains(page, 'Upload new photo')
         self.assertContains(page, 'Delete item')
-        self.assertContains(page, reverse('zoo:item_assignment'))   # link to Item Assignments
         self.assertContains(page, 'Back to Enrichment Items')
         self.assertNotContains(self.client.get(self.url), 'Change name')  # nothing selected
         self.assertContains(page, 'id="search-3"')  # the three filter boxes for the picker
