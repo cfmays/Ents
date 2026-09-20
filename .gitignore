@@ -1,0 +1,2 @@
+# copy of the production db (has user accounts and password hashes)
+/db.sqlite3

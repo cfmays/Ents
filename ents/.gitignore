@@ -188,3 +188,6 @@ pip-delete-this-directory.txt
 !.vscode/launch.json 
 !.vscode/extensions.json 
 .history
+
+# copy of the production db put here for Claude
+db.sqlite3
