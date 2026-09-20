@@ -64,8 +64,9 @@ def calendar_tab(request, asg_id, year=None, month=None):
     month_start = date(year, month, 1)
     month_end = date(year, month, days_in_month)
 
-    FormSet = make_calendar_entry_formset(asg, year, month)
     queryset = CalendarEntry.objects.filter(asg=asg, date__gte=month_start, date__lte=month_end)
+    # blank rows fill the page up to 5 rows in total, but always leave at least 1 blank row
+    FormSet = make_calendar_entry_formset(asg, year, month, extra=max(1, 5 - queryset.count()))
 
     read_only = (year, month) < (today.year, today.month)  # past months can't be changed
 

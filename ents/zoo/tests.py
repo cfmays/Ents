@@ -254,6 +254,25 @@ class KeeperAccessScopingTests(TestCase):
         response = self.client.post(reverse('zoo:calendar_tab', args=[self.asg.id]), data)
         self.assertContains(response, 'Please choose an enrichment item.')
 
+    def test_blank_rows_fill_up_to_five_with_at_least_one(self):
+        item = Enrichment.objects.create(name='Ball', photo=make_image_file(name='ball.png'))
+        ASGApprovedItem.objects.create(asg=self.asg, item=item)
+        self.client.force_login(self.assigned_keeper)
+        url = reverse('zoo:calendar_tab', args=[self.asg.id, 2026, 9])
+
+        def rows():
+            response = self.client.get(url)
+            formset = response.context['formset']
+            return len(formset.initial_forms), len(formset.extra_forms)
+
+        self.assertEqual(rows(), (0, 5))
+        for day in range(1, 4):
+            CalendarEntry.objects.create(asg=self.asg, date=f'2026-09-0{day}', item=item)
+        self.assertEqual(rows(), (3, 2))      # 3 filled + 2 blank = 5
+        for day in range(4, 8):
+            CalendarEntry.objects.create(asg=self.asg, date=f'2026-09-0{day}', item=item)
+        self.assertEqual(rows(), (7, 1))      # never fewer than 1 blank row
+
     def test_history_hides_entries_dated_after_today(self):
         past = Enrichment.objects.create(name='Past ball', photo=make_image_file(name='p.png'))
         today = Enrichment.objects.create(name='Today ball', photo=make_image_file(name='t.png'))
@@ -266,6 +285,12 @@ class KeeperAccessScopingTests(TestCase):
         self.assertContains(page, 'Past ball')
         self.assertContains(page, 'Today ball')
         self.assertNotContains(page, 'Future ball')
+
+    def test_calendar_page_has_the_photo_overlay(self):
+        self.client.force_login(self.assigned_keeper)
+        page = self.client.get(reverse('zoo:calendar_tab', args=[self.asg.id]))
+        self.assertContains(page, 'id="photo-overlay"')
+        self.assertContains(page, 'item-thumb')
 
     def test_calendar_page_warns_before_leaving_with_unsaved_changes(self):
         self.client.force_login(self.assigned_keeper)
