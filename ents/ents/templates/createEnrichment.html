@@ -1,29 +1,96 @@
-
-{% extends "base_generic.html" %} 
+{% extends "base_generic.html" %}
 
 {% block content %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css">
+<style>
+  .select2-results__option { white-space: normal; overflow-wrap: anywhere; }
+  .select2-selection--single { height: 60px !important; }
+  .select2-selection--single .select2-selection__rendered { line-height: 60px !important; display: flex; align-items: center; }
+  .select2-selection--single .select2-selection__arrow { height: 60px !important; }
+  .manage-panel { border: 1px solid #c9bd9c; border-radius: 6px; background: #f8f0d8; padding: 12px 16px; margin: 12px 0; }
+  .manage-panel form { margin-bottom: 10px; }
+</style>
 
-<h1> Upload New Item</h1>
+<h1>Manage Items</h1>
+<p>
+  <a href="{% url 'zoo:item_assignment' %}">Item Assignments</a> |
+  <a href="{% url 'index' %}">Back to Enrichment Items</a>
+</p>
 
+<h4>Select an existing item</h4>
+<select id="pick-item" style="width:100%; max-width:700px">
+  <option value="">Choose an item&hellip; (type to search)</option>
+  {% for i in items %}<option value="{{ i.id }}"{% if i.photo %} data-thumb="{{ i.photo.url }}"{% endif %}{% if item and i.id == item.id %} selected{% endif %}>{{ i.name }}</option>{% endfor %}
+</select>
+
+{% if item %}
+<div class="manage-panel">
+  <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start">
+    {% if item.photo %}<img src="{{ item.photo.url }}" style="max-width:240px; max-height:320px; border-radius:6px" alt="">
+    {% else %}<div style="width:120px; height:120px; background:#ddd; border-radius:6px; display:flex; align-items:center; justify-content:center" class="text-muted">No photo</div>{% endif %}
+    <div style="flex:1; min-width:280px">
+      <h5>{{ item.name }}</h5>
+      <p class="text-muted small">
+        Approved on {{ calendars }} calendar{{ calendars|pluralize }}; used in {{ entries }} calendar entr{{ entries|pluralize:"y,ies" }}.
+      </p>
+
+      <form method="post" style="display:flex; gap:8px; align-items:center">
+        {% csrf_token %}
+        <input type="hidden" name="item" value="{{ item.id }}">
+        <label for="new-name" class="mb-0">Name:</label>
+        <input type="text" id="new-name" name="name" value="{{ item.name }}" maxlength="255" class="form-control" style="max-width:420px">
+        <button type="submit" name="action" value="rename" class="btn btn-sm btn-secondary">Change name</button>
+      </form>
+
+      <form method="post" enctype="multipart/form-data" style="display:flex; gap:8px; align-items:center">
+        {% csrf_token %}
+        <input type="hidden" name="item" value="{{ item.id }}">
+        <label for="new-photo" class="mb-0">Photo:</label>
+        <input type="file" id="new-photo" name="photo" accept="image/*" required>
+        <button type="submit" name="action" value="photo" class="btn btn-sm btn-secondary">Upload new photo</button>
+      </form>
+
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="item" value="{{ item.id }}">
+        {% if entries %}
+        <button type="button" class="btn btn-sm btn-outline-danger" disabled>Delete item</button>
+        <span class="text-muted small">Can't be deleted while it is used in calendar entries.</span>
+        {% else %}
+        <button type="submit" name="action" value="delete" class="btn btn-sm btn-outline-danger"
+                onclick="return confirm('Delete {{ item.name|escapejs }}?{% if calendars %} It will also be removed from the {{ calendars }} calendar{{ calendars|pluralize }} it is approved on.{% endif %} This cannot be undone.');">Delete item</button>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<hr>
+<h4>Add a new item</h4>
 <form method="post" enctype="multipart/form-data">{% csrf_token %}
-    {{ form.as_p }}
-    <input type="submit" value="Save">
-
-
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-  <script>
-    $("#id_photo").change(function () {
-      
-        
-      var theChosenFileName = $(this).val();  
-      var theItemName = document.getElementById("id_name").value;
-      if (theItemName.length == '') {
-          document.getElementById("id_name").value=theItemName
-      }
-    }
-    )
-  </script>
+  {{ form.as_p }}
+  <input type="submit" value="Add new item">
 </form>
 
-{% endblock %}
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+  function thumbFormatter(size) {
+    return function (option) {
+      if (!option.id) { return option.text; }
+      var thumb = $(option.element).data("thumb");
+      if (!thumb) { return option.text; }
+      return $('<span style="display:flex;align-items:center;"><img src="' + thumb + '" style="height:' + size +
+        'px;width:' + size + 'px;flex-shrink:0;object-fit:cover;border-radius:4px;margin-right:8px;"><span class="item-label"></span></span>')
+        .find(".item-label").text(option.text).end();
+    };
+  }
+  $("#pick-item").select2({ width: "100%", templateResult: thumbFormatter(56), templateSelection: thumbFormatter(50) });
 
+  // choosing an item reloads this page with that item's options
+  $("#pick-item").on("change", function () {
+    var id = $(this).val();
+    window.location.href = "{% url 'createView' %}" + (id ? "?item=" + id : "");
+  });
+</script>
+{% endblock %}

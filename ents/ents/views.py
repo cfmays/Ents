@@ -1,10 +1,12 @@
+from django.contrib import messages
+from django.core.files.storage import default_storage
 from django.http.response import JsonResponse
 from django.shortcuts import render
 from .models import Enrichment
 from django.contrib.auth import logout
 from django.http import HttpResponseRedirect
 from django.urls import reverse
-from .forms import CreateEnrichmentForm, enrichment_items_form
+from .forms import CreateEnrichmentForm, ItemPhotoForm, enrichment_items_form
 from .settings import MEDIA_URL
 from zoo.permissions import supervisor_required
 
@@ -22,27 +24,75 @@ def index(request):
 
 
 
+def _manage_item(request, item, action):
+    """Rename, replace the photo of, or delete the selected item; then go back to the Manage Items page."""
+    manage = reverse('createView')
+    if item is None:
+        messages.warning(request, 'Choose an item first.')
+        return HttpResponseRedirect(manage)
+    back = f'{manage}?item={item.id}'
+
+    if action == 'rename':
+        name = ' '.join(request.POST.get('name', '').split())
+        if not name:
+            messages.warning(request, 'An item needs a name.')
+        elif Enrichment.objects.filter(name__iexact=name).exclude(pk=item.pk).exists():
+            messages.warning(request, f'Another item is already named "{name}".')
+        else:
+            item.name = name
+            item.save()
+            messages.success(request, 'Item renamed.')
+    elif action == 'photo':
+        form = ItemPhotoForm(request.POST, request.FILES)
+        if form.is_valid():
+            old_photo = item.photo.name
+            item.photo.save(form.cleaned_data['photo'].name, form.cleaned_data['photo'], save=True)  # also resizes it
+            if old_photo and old_photo != item.photo.name:
+                item.photo.storage.delete(old_photo)
+            messages.success(request, 'Photo replaced.')
+        else:
+            messages.warning(request, 'Choose an image file (jpg, png, gif or webp).')
+    else:  # delete
+        entries = item.calendar_entries.count()
+        if entries:
+            messages.warning(request, f'{item.name} is used in {entries} calendar entries, so it cannot be deleted.')
+        else:
+            name, old_photo = item.name, item.photo.name
+            item.delete()  # also takes it off the calendars it was approved on
+            if old_photo:
+                default_storage.delete(old_photo)
+            messages.success(request, f'Deleted {name}.')
+            return HttpResponseRedirect(manage)
+    return HttpResponseRedirect(back)
+
+
 @supervisor_required
 def EnrichmentUploadView(request):
-    if request.method == 'POST':
-        #print('in POST')
-        #print (request)
-        form = CreateEnrichmentForm(request.POST, request.FILES)
-        #import ipdb; ipdb.set_trace()
-        #print('form created')
-        if form.is_valid():
-            #print('saving form...')
-            form.save()
-            return HttpResponseRedirect(reverse('index'))
-        else:
-            #print('form is not valid')
-            return render(request, 'createEnrichment.html', {'form':form})
+    """Manage Items: pick an existing item to rename / re-photo / delete, or upload a new one."""
+    item = Enrichment.objects.filter(pk=request.GET.get('item') or request.POST.get('item') or None).first()
+    action = request.POST.get('action')
+    if request.method == 'POST' and action in ('rename', 'photo', 'delete'):
+        return _manage_item(request, item, action)
 
+    if request.method == 'POST':
+        form = CreateEnrichmentForm(request.POST, request.FILES)
+        if form.is_valid():
+            new_item = form.save()
+            messages.success(request, f'Added {new_item.name}.')
+            return HttpResponseRedirect(f"{reverse('createView')}?item={new_item.id}")  # stay on Manage Items
     else:
-        #print('in else')
-        #print (request)
         form = CreateEnrichmentForm()
-        return render(request, 'createEnrichment.html', {'form':form})
+    calendars = entries = 0
+    if item:
+        calendars = item.asg_assignments.values('asg').distinct().count()
+        entries = item.calendar_entries.count()
+    return render(request, 'createEnrichment.html', {
+        'form': form,
+        'item': item,
+        'items': Enrichment.objects.all(),
+        'calendars': calendars,
+        'entries': entries,
+    })
 
 def logout_view(request):
     logout(request)

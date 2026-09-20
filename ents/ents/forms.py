@@ -31,3 +31,7 @@ class enrichment_items_form(Form):
     searchString3 = forms.CharField(label = 'and also (optional)', required=False)
     doSearch = forms.BooleanField(label = 'Check to filter, uncheck to reset')
     items = forms.ModelChoiceField(label = 'Select Item',queryset=Enrichment.objects.all(), required=False, widget=EnrichmentSelect)
+
+
+class ItemPhotoForm(forms.Form):
+    photo = forms.ImageField()

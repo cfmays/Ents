@@ -1,3 +1,4 @@
+import os
 import io
 import shutil
 import tempfile
@@ -104,23 +105,23 @@ class EnrichmentUploadViewTests(TestCase):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
 
-    def test_index_hides_new_item_link_for_non_supervisor(self):
+    def test_index_hides_manage_items_link_for_non_supervisor(self):
         User.objects.create_user(username='carol', password='password123')
         self.client.login(username='carol', password='password123')
         response = self.client.get(reverse('index'))
-        self.assertNotContains(response, 'New Item')
+        self.assertNotContains(response, 'Manage Items')
 
-    def test_index_shows_new_item_link_for_supervisor(self):
+    def test_index_shows_manage_items_link_for_supervisor(self):
         self.client.login(username='alice', password='password123')
         response = self.client.get(reverse('index'))
-        self.assertContains(response, 'New Item')
-        self.assertNotContains(self.client.get(reverse('zoo:asg_list')), 'New Item')  # no longer in the menu bar
+        self.assertContains(response, 'Manage Items')
+        self.assertNotContains(self.client.get(reverse('zoo:asg_list')), 'Manage Items')  # not in the menu bar
 
-    def test_index_shows_new_item_link_for_superuser(self):
+    def test_index_shows_manage_items_link_for_superuser(self):
         User.objects.create_superuser(username='root2', email='root2@example.com', password='password123')
         self.client.login(username='root2', password='password123')
         response = self.client.get(reverse('index'))
-        self.assertContains(response, 'New Item')
+        self.assertContains(response, 'Manage Items')
 
     def test_get_renders_form_when_logged_in(self):
         self.client.login(username='alice', password='password123')
@@ -128,14 +129,14 @@ class EnrichmentUploadViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'createEnrichment.html')
 
-    def test_post_valid_form_creates_enrichment_and_redirects(self):
+    def test_post_valid_form_creates_enrichment_and_stays_on_manage_items(self):
         self.client.login(username='alice', password='password123')
         response = self.client.post(self.url, {
             'name': 'Kong Toy',
             'photo': make_image_file(),
         })
-        self.assertRedirects(response, reverse('index'))
-        self.assertTrue(Enrichment.objects.filter(name='Kong Toy').exists())
+        new_item = Enrichment.objects.get(name='Kong Toy')
+        self.assertRedirects(response, f"{reverse('createView')}?item={new_item.id}")  # stays on Manage Items, item selected
 
     def test_post_invalid_form_reshows_form_with_errors(self):
         self.client.login(username='alice', password='password123')
@@ -151,6 +152,73 @@ class EnrichmentUploadViewTests(TestCase):
         })
         self.assertEqual(response.status_code, 302)
         self.assertFalse(Enrichment.objects.exists())
+
+
+@override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
+class ManageItemsTests(TestCase):
+
+    def setUp(self):
+        self.user = User.objects.create_user(username='alice2', password='password123')
+        self.user.groups.add(Group.objects.get_or_create(name='Supervisor')[0])
+        self.client.login(username='alice2', password='password123')
+        self.url = reverse('createView')
+        self.item = Enrichment.objects.create(name='Old Ball', photo=make_image_file(name='old.png'))
+
+    def test_selecting_an_item_shows_its_options_and_top_links(self):
+        page = self.client.get(self.url, {'item': self.item.id})
+        self.assertContains(page, 'Change name')
+        self.assertContains(page, 'Upload new photo')
+        self.assertContains(page, 'Delete item')
+        self.assertContains(page, reverse('zoo:item_assignment'))   # link to Item Assignments
+        self.assertContains(page, 'Back to Enrichment Items')
+        self.assertNotContains(self.client.get(self.url), 'Change name')  # nothing selected
+
+    def test_rename_item_and_refuse_duplicate_names(self):
+        Enrichment.objects.create(name='Other Ball', photo=make_image_file(name='o.png'))
+        self.client.post(self.url, {'action': 'rename', 'item': self.item.id, 'name': '  New   Ball '})
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.name, 'New Ball')
+        self.client.post(self.url, {'action': 'rename', 'item': self.item.id, 'name': 'other ball'})
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.name, 'New Ball')  # name already used (any capitalization)
+
+    def test_replace_photo_removes_the_old_file(self):
+        old_path = self.item.photo.path
+        self.assertTrue(os.path.exists(old_path))
+        response = self.client.post(self.url, {'action': 'photo', 'item': self.item.id, 'photo': make_image_file(name='new.png')})
+        self.assertEqual(response.status_code, 302)
+        self.item.refresh_from_db()
+        self.assertIn('new', self.item.photo.name)
+        self.assertFalse(os.path.exists(old_path))
+        self.assertTrue(os.path.exists(self.item.photo.path))
+
+    def test_bad_photo_is_refused(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        old_name = self.item.photo.name
+        self.client.post(self.url, {'action': 'photo', 'item': self.item.id, 'photo': SimpleUploadedFile('x.txt', b'not an image')})
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.photo.name, old_name)
+
+    def test_delete_item_takes_it_off_calendars_but_is_refused_when_used_in_entries(self):
+        from zoo.models import ASG, ASGApprovedItem, CalendarEntry, String
+        asg = ASG.objects.create(name='Tiger', string=String.objects.create(name='S'))
+        ASGApprovedItem.objects.create(asg=asg, item=self.item)
+        used = Enrichment.objects.create(name='Used Ball', photo=make_image_file(name='u.png'))
+        CalendarEntry.objects.create(asg=asg, date='2026-09-02', item=used)
+
+        self.client.post(self.url, {'action': 'delete', 'item': used.id})
+        self.assertTrue(Enrichment.objects.filter(pk=used.pk).exists())  # protected by its calendar entry
+
+        self.client.post(self.url, {'action': 'delete', 'item': self.item.id})
+        self.assertFalse(Enrichment.objects.filter(pk=self.item.pk).exists())
+        self.assertFalse(ASGApprovedItem.objects.exists())
+
+    def test_keepers_cannot_use_the_actions(self):
+        User.objects.create_user(username='kay2', password='password123')
+        self.client.login(username='kay2', password='password123')
+        response = self.client.post(self.url, {'action': 'delete', 'item': self.item.id})
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Enrichment.objects.filter(pk=self.item.pk).exists())
 
 
 class LogoutViewTests(TestCase):
