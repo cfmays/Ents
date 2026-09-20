@@ -172,6 +172,7 @@ class ManageItemsTests(TestCase):
         self.assertContains(page, reverse('zoo:item_assignment'))   # link to Item Assignments
         self.assertContains(page, 'Back to Enrichment Items')
         self.assertNotContains(self.client.get(self.url), 'Change name')  # nothing selected
+        self.assertContains(page, 'id="search-3"')  # the three filter boxes for the picker
 
     def test_rename_item_and_refuse_duplicate_names(self):
         Enrichment.objects.create(name='Other Ball', photo=make_image_file(name='o.png'))
