@@ -37,12 +37,6 @@
          
         </ul>
         <ul class="navbar-nav">
-          {% if user.is_staff %}
-          <li class="nav-item">
-            <a class="nav-link" href="{% url 'admin:index' %}">Admin panel</a>
-          </li>
-          {% endif %} 
-          
           {% if user.is_authenticated %}
           <li class="nav-item">
             <a class="nav-link" href="{% url 'zoo:asg_list' %}">Enrichment Calendars</a>
@@ -66,6 +60,11 @@
               <label style="margin:0;white-space:nowrap"><input type="checkbox" name="division" value="{{ division.id }}"{% if checked %} checked{% endif %} onchange="this.form.submit()"> {{ division.name }}</label>
               {% endfor %}
             </form>
+          </li>
+          {% endif %}
+          {% if user.is_staff %}
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'admin:index' %}">Admin panel</a>
           </li>
           {% endif %}
 
