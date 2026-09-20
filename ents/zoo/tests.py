@@ -87,6 +87,11 @@ class TrainingFlowTests(TestCase):
         self.client.force_login(other)
         self.assertEqual(self.client.get(reverse('zoo:training_history', args=[self.animal.id])).status_code, 403)
 
+    def test_training_form_warns_before_leaving_with_unsaved_changes(self):
+        self.client.force_login(self.keeper)
+        page = self.client.get(reverse('zoo:training_entry', args=[self.animal.id]))
+        self.assertContains(page, 'beforeunload')
+
     def test_submitting_training_session_creates_behavior_scores(self):
         self.client.force_login(self.keeper)
         response = self.client.post(reverse('zoo:training_entry', args=[self.animal.id]), {
@@ -192,7 +197,7 @@ class KeeperAccessScopingTests(TestCase):
         self.assertContains(page, 'past month and is read only')
         self.assertNotContains(page, 'Changes not saved automatically')  # nothing to save in a past month
         self.assertContains(page, 'old note')
-        for editable in ('form-0-date', '>Save calendar<', '>+ Add row<', '>Paste<'):
+        for editable in ('form-0-date', '>Save changes<', '>+ Add row<', '>Paste<'):
             self.assertNotContains(page, editable)
         self.assertContains(page, '>Copy<')
 
@@ -209,8 +214,8 @@ class KeeperAccessScopingTests(TestCase):
         self.assertTrue(CalendarEntry.objects.filter(date='2026-10-03').exists())  # future months take pastes
 
         this_month = self.client.get(reverse('zoo:calendar_tab', args=[self.asg.id, 2026, 9]))
-        self.assertContains(this_month, '>Save calendar<')
-        self.assertContains(this_month, 'Changes not saved automatically. Click Save calendar at the bottom to save.')
+        self.assertContains(this_month, '>Save changes<')
+        self.assertContains(this_month, 'Changes not saved automatically. Click Save changes at the bottom to save.')
 
     def test_calendar_animal_dropdown_offers_the_calendars_choices_only(self):
         Animal.objects.create(asg=self.asg, name='Carl/ Pat')

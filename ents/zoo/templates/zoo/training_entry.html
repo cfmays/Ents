@@ -56,6 +56,16 @@
 </form>
 
 <script>
+  // warn before leaving with a training session that hasn't been submitted
+  var unsaved = false;
+  $("form").on("input change", function () { unsaved = true; }).on("submit", function () { unsaved = false; });
+  window.addEventListener("beforeunload", function (event) {
+    if (unsaved) {
+      event.preventDefault();
+      event.returnValue = "";  // browsers show their own "Leave site? Changes may not be saved" prompt
+    }
+  });
+
   $("#id_reinforcer_1").change(function () {
     if ($(this).val()) { $("#reinforcer-2-group").show(); }
   });

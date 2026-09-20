@@ -21,7 +21,7 @@
 
   .alert-danger { overflow-wrap: anywhere; }
 
-  /* Add row / Save calendar: same compact height */
+  /* Add row / Save changes: same compact height */
   .calendar-btn { padding: 0.1rem 0.6rem; font-size: 0.875rem; line-height: 1.3; }
 
   /* DO/IO/GBS dropdowns: narrow closed box showing just the code, full text once opened */
@@ -43,7 +43,7 @@
 <p class="mt-2">
   {% if can_manage_lists %}<a href="{% url 'zoo:list_management_tab' asg.id %}">List management</a> |{% endif %}
   <a href="{% url 'zoo:reporting_view' asg.id %}">History</a>
-  {% if not read_only %}<strong class="text-danger" style="margin-left:80px">Changes not saved automatically. Click Save calendar at the bottom to save.</strong>{% endif %}
+  {% if not read_only %}<strong class="text-danger" style="margin-left:80px">Changes not saved automatically. Click Save changes at the bottom to save.</strong>{% endif %}
 </p>
 
 {% if asg.special_concerns.all %}
@@ -154,7 +154,7 @@
     </tbody>
   </table>
   <button type="button" id="add-row-btn" class="btn btn-outline-secondary calendar-btn">+ Add row</button>
-  <button type="submit" class="btn btn-primary calendar-btn">Save calendar</button>
+  <button type="submit" class="btn btn-primary calendar-btn">Save changes</button>
   <span style="float:right">
     <span id="clipboard-note" class="text-muted small" style="margin-right:8px">{% if clipboard %}Copied: {{ clipboard }}{% endif %}</span>
     <button type="button" id="copy-btn" class="btn btn-outline-secondary calendar-btn">Copy</button>
