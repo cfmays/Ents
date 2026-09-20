@@ -43,6 +43,7 @@
 <p class="mt-2">
   {% if can_manage_lists %}<a href="{% url 'zoo:list_management_tab' asg.id %}">List management</a> |{% endif %}
   <a href="{% url 'zoo:reporting_view' asg.id %}">History</a>
+  {% if not read_only %}<strong class="text-danger" style="margin-left:16px">Changes not saved automatically. Click Save calendar at the bottom to save.</strong>{% endif %}
 </p>
 
 {% if asg.special_concerns.all %}

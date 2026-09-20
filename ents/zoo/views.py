@@ -339,7 +339,9 @@ def list_management_tab(request, asg_id):
 @login_required
 def reporting_view(request, asg_id):
     asg = _get_accessible_asg(request, asg_id)
-    entries = CalendarEntry.objects.filter(asg=asg).select_related('item', 'animal', 'behavior_goal').order_by('-date', '-id')
+    entries = CalendarEntry.objects.filter(asg=asg, date__lte=_today()).select_related(
+        'item', 'animal', 'behavior_goal',
+    ).order_by('-date', '-id')  # history: nothing dated after today
     paginator = Paginator(entries, 50)
     page_obj = paginator.get_page(request.GET.get('page'))
     return render(request, 'zoo/reporting.html', {'asg': asg, 'page_obj': page_obj})

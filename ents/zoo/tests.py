@@ -190,6 +190,7 @@ class KeeperAccessScopingTests(TestCase):
 
         page = self.client.get(aug)
         self.assertContains(page, 'past month and is read only')
+        self.assertNotContains(page, 'Changes not saved automatically')  # nothing to save in a past month
         self.assertContains(page, 'old note')
         for editable in ('form-0-date', '>Save calendar<', '>+ Add row<', '>Paste<'):
             self.assertNotContains(page, editable)
@@ -209,6 +210,7 @@ class KeeperAccessScopingTests(TestCase):
 
         this_month = self.client.get(reverse('zoo:calendar_tab', args=[self.asg.id, 2026, 9]))
         self.assertContains(this_month, '>Save calendar<')
+        self.assertContains(this_month, 'Changes not saved automatically. Click Save calendar at the bottom to save.')
 
     def test_calendar_animal_dropdown_offers_the_calendars_choices_only(self):
         Animal.objects.create(asg=self.asg, name='Carl/ Pat')
@@ -246,6 +248,19 @@ class KeeperAccessScopingTests(TestCase):
         data['form-0-date'] = '2026-09-02'
         response = self.client.post(reverse('zoo:calendar_tab', args=[self.asg.id]), data)
         self.assertContains(response, 'Please choose an enrichment item.')
+
+    def test_history_hides_entries_dated_after_today(self):
+        past = Enrichment.objects.create(name='Past ball', photo=make_image_file(name='p.png'))
+        today = Enrichment.objects.create(name='Today ball', photo=make_image_file(name='t.png'))
+        future = Enrichment.objects.create(name='Future ball', photo=make_image_file(name='f.png'))
+        CalendarEntry.objects.create(asg=self.asg, date='2026-09-18', item=past)
+        CalendarEntry.objects.create(asg=self.asg, date='2026-09-19', item=today)  # "today" is pinned to 2026-09-19
+        CalendarEntry.objects.create(asg=self.asg, date='2026-09-20', item=future)
+        self.client.force_login(self.assigned_keeper)
+        page = self.client.get(reverse('zoo:reporting_view', args=[self.asg.id]))
+        self.assertContains(page, 'Past ball')
+        self.assertContains(page, 'Today ball')
+        self.assertNotContains(page, 'Future ball')
 
     def test_calendar_page_warns_before_leaving_with_unsaved_changes(self):
         self.client.force_login(self.assigned_keeper)
