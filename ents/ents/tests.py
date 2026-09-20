@@ -105,14 +105,17 @@ class EnrichmentUploadViewTests(TestCase):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
 
-    def test_admin_panel_is_the_last_menu_choice(self):
+    def test_admin_panel_sits_between_logged_in_as_and_working_in(self):
+        from zoo.models import Division
+        Division.objects.create(name='Terrestrial')
+        Division.objects.create(name='Aquatic')   # two divisions, so the "Working in" boxes show
         User.objects.create_superuser(username='root3', email='root3@example.com', password='password123')
         self.client.login(username='root3', password='password123')
         html = self.client.get(reverse('index')).content.decode()
         menu = html[html.index('<ul class="navbar-nav">'):html.index('</nav>')]
-        self.assertIn('Admin panel', menu)
         for earlier in ('Enrichment Calendars', 'Training Log', 'Log Out', 'Logged in as'):
             self.assertLess(menu.index(earlier), menu.index('Admin panel'), earlier)
+        self.assertLess(menu.index('Admin panel'), menu.index('Working in:'))
 
     def test_index_hides_manage_items_link_for_non_supervisor(self):
         User.objects.create_user(username='carol', password='password123')

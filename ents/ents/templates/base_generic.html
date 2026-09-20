@@ -50,6 +50,11 @@
           <li class="nav-item">
             <span class="nav-link pe-1">Logged in as <strong>{{ user.username|capfirst }}</strong></span>
           </li>
+          {% if user.is_staff %}
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'admin:index' %}">Admin panel</a>
+          </li>
+          {% endif %}
           {% if division_picker %}
           <li class="nav-item">
             <form method="post" action="{% url 'zoo:set_divisions' %}" class="nav-link" style="display:flex;gap:10px;align-items:center;margin:0">
@@ -60,11 +65,6 @@
               <label style="margin:0;white-space:nowrap"><input type="checkbox" name="division" value="{{ division.id }}"{% if checked %} checked{% endif %} onchange="this.form.submit()"> {{ division.name }}</label>
               {% endfor %}
             </form>
-          </li>
-          {% endif %}
-          {% if user.is_staff %}
-          <li class="nav-item">
-            <a class="nav-link" href="{% url 'admin:index' %}">Admin panel</a>
           </li>
           {% endif %}
 
