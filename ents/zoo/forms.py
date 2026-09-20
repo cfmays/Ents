@@ -153,7 +153,7 @@ class TrainingSessionForm(forms.Form):
 
 class ItemAssignmentForm(forms.Form):
     items = forms.ModelMultipleChoiceField(queryset=Enrichment.objects.all(), widget=forms.SelectMultiple(attrs={'size': 10}))
-    asgs = forms.ModelMultipleChoiceField(queryset=ASG.objects.all(), widget=forms.SelectMultiple(attrs={'size': 10}), label='Calendars')
+    asgs = forms.ModelMultipleChoiceField(queryset=ASG.objects.all(), widget=forms.SelectMultiple(attrs={'size': 10}), label='Calendar Lists')
 
     def __init__(self, *args, divisions=None, **kwargs):
         super().__init__(*args, **kwargs)

@@ -531,6 +531,38 @@ class SupervisorPermissionTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(ASGApprovedItem.objects.filter(item=item).count(), 2)
 
+    def test_lookup_lists_calendar_lists_and_supervisor_can_remove_one_or_all(self):
+        string = String.objects.create(name='Test String', division=self.division)
+        asg1 = ASG.objects.create(name='List One', string=string)
+        asg2 = ASG.objects.create(name='List Two', string=string)
+        other_string = String.objects.create(name='Other Division', division=Division.objects.create(name='Aquatic'))
+        asg3 = ASG.objects.create(name='List Three', string=other_string)
+        item = Enrichment.objects.create(name='Ball', photo=make_image_file(name='ball.png'))
+        for asg in (asg1, asg2, asg3):
+            ASGApprovedItem.objects.create(asg=asg, item=item)
+        ASGApprovedItem.objects.create(asg=asg1, item=item, is_food=True)  # same item in both columns
+
+        self.client.force_login(self.supervisor)
+        lookup = self.client.get(reverse('zoo:item_ajax_asgs_for_item'), {'item_id': item.id}).json()
+        self.assertEqual(sorted(a['name'] for a in lookup['asgs']), ['List One', 'List Two'])  # own division only, no repeats
+
+        url = reverse('zoo:item_remove_from_asgs')
+        self.client.post(url, {'item_id': item.id, 'asg_id': asg2.id})
+        self.assertEqual(sorted(ASGApprovedItem.objects.filter(item=item).values_list('asg__name', flat=True)), ['List One', 'List One', 'List Three'])
+        self.client.post(url, {'item_id': item.id})   # all lists in the supervisor's division
+        self.assertEqual(list(ASGApprovedItem.objects.filter(item=item).values_list('asg__name', flat=True)), ['List Three'])
+
+        self.client.force_login(self.keeper)
+        self.assertEqual(self.client.post(url, {'item_id': item.id}).status_code, 403)
+
+    def test_item_assignment_page_says_calendar_list(self):
+        self.client.force_login(self.supervisor)
+        page = self.client.get(reverse('zoo:item_assignment'))
+        self.assertContains(page, 'Calendar List Assignments')
+        self.assertContains(page, "Look up an item's calendar lists")
+        self.assertContains(page, 'Remove from all calendar lists')
+        self.assertNotContains(page, "item's calendars")
+
     def test_supervisor_cannot_assign_items_to_other_divisions_asg(self):
         other_division = Division.objects.create(name='Aquatic')
         other_string = String.objects.create(name='Other String', division=other_division)

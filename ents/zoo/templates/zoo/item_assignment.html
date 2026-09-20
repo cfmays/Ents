@@ -10,7 +10,7 @@
   /* the placeholder was clipped: the search field inherited the page font but not enough height */
   .select2-selection--multiple .select2-search__field { font-size: 14px !important; height: 28px !important; line-height: 28px !important; margin-top: 0 !important; }
 </style>
-<h1>Item &harr; Calendar Assignments</h1>
+<h1>Item &harr; Calendar List Assignments</h1>
 
 <h4>Filter the item lists</h4>
 <p class="text-muted small mb-1">Applies to both item lists below. An item must contain every box that has text. Items you have already picked stay in the list.</p>
@@ -20,18 +20,19 @@
 <p>Check to filter, uncheck to reset: <input type="checkbox" id="filter-on"></p>
 <hr>
 
-<h4>Look up an item's calendars</h4>
+<h4>Look up an item's calendar lists</h4>
 <select id="lookup-item" class="form-control" style="max-width:400px;">
   <option value="">Choose an item&hellip;</option>
   {% for item in form.fields.items.queryset %}
   <option value="{{ item.id }}">{{ item.name }}</option>
   {% endfor %}
 </select>
-<ul id="lookup-result" class="mt-2"></ul>
+<p id="remove-all-wrap" class="mt-2 mb-1" style="display:none"><a href="#" id="remove-all" class="text-danger">Remove from all calendar lists</a></p>
+<ul id="lookup-result" class="mt-1"></ul>
 
 <hr>
 
-<h4>Assign item(s) to calendar(s)</h4>
+<h4>Assign item(s) to calendar list(s)</h4>
 <form method="post">
   {% csrf_token %}
   {{ form.as_p }}
@@ -99,24 +100,48 @@
   });
   $("label[for=id_items]").text("Items (" + allItems.length + " items):");
 
-  $("#lookup-item").change(function () {
-    var itemId = $(this).val();
-    var resultEl = $("#lookup-result");
-    resultEl.empty();
+  // look up the calendar lists an item is on, with links to remove it from one or all of them
+  function loadLookup() {
+    var itemId = $("#lookup-item").val();
+    var resultEl = $("#lookup-result").empty();
+    $("#remove-all-wrap").hide();
     if (!itemId) { return; }
     $.ajax({
       url: "{% url 'zoo:item_ajax_asgs_for_item' %}",
       data: {'item_id': itemId},
       success: function (data) {
         if (!data.asgs.length) {
-          resultEl.append("<li><em>Not assigned to any calendar yet.</em></li>");
+          resultEl.append("<li><em>Not assigned to any calendar list yet.</em></li>");
           return;
         }
-        data.asgs.forEach(function (name) {
-          resultEl.append("<li>" + name + "</li>");
+        $("#remove-all-wrap").show();
+        data.asgs.forEach(function (asg) {
+          var $li = $("<li>").text(asg.name + " ");
+          $("<a>").attr("href", "#").addClass("remove-one text-danger small").data("asg", asg.id).data("name", asg.name)
+            .text("Remove").appendTo($li);
+          resultEl.append($li);
         });
       }
     });
+  }
+
+  function removeFromLists(asgId, question) {
+    if (!confirm(question)) { return; }
+    var data = {item_id: $("#lookup-item").val(), csrfmiddlewaretoken: $("input[name=csrfmiddlewaretoken]").val()};
+    if (asgId) { data.asg_id = asgId; }
+    $.post("{% url 'zoo:item_remove_from_asgs' %}", data, loadLookup);
+  }
+
+  $("#lookup-item").change(loadLookup);
+  $("#remove-all").click(function (event) {
+    event.preventDefault();
+    var itemName = $("#lookup-item option:selected").text();
+    removeFromLists(null, "Remove " + itemName + " from ALL of its calendar lists?");
+  });
+  $("#lookup-result").on("click", "a.remove-one", function (event) {
+    event.preventDefault();
+    var itemName = $("#lookup-item option:selected").text();
+    removeFromLists($(this).data("asg"), "Remove " + itemName + " from the " + $(this).data("name") + " calendar list?");
   });
 </script>
 {% endblock %}

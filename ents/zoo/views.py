@@ -421,7 +421,7 @@ def item_assignment_view(request):
                 for asg in form.cleaned_data['asgs']:
                     _, was_created = ASGApprovedItem.objects.get_or_create(asg=asg, item=item, is_food=default_is_food(item))
                     created += int(was_created)
-            messages.success(request, f'Created {created} new item/calendar assignment(s).')
+            messages.success(request, f'Created {created} new item/calendar list assignment(s).')
             return redirect('zoo:item_assignment')
     else:
         form = ItemAssignmentForm(divisions=division_scope(request))
@@ -436,7 +436,23 @@ def item_ajax_asgs_for_item(request):
     scope = division_scope(request)
     if scope is not None:
         asgs = asgs.filter(string__division__in=scope)
-    return JsonResponse({'asgs': [asg.name for asg in asgs]})
+    return JsonResponse({'asgs': [{'id': asg.id, 'name': asg.name} for asg in asgs.distinct()]})
+
+
+@supervisor_required
+@require_POST
+def item_remove_from_asgs(request):
+    """Take an item off one calendar list (asg_id given) or off all of them, within the ticked divisions."""
+    item = get_object_or_404(Enrichment, pk=request.POST.get('item_id'))
+    assignments = ASGApprovedItem.objects.filter(item=item)
+    scope = division_scope(request)
+    if scope is not None:
+        assignments = assignments.filter(asg__string__division__in=scope)
+    if request.POST.get('asg_id'):
+        assignments = assignments.filter(asg_id=request.POST['asg_id'])
+    calendars = assignments.values('asg').distinct().count()
+    assignments.delete()
+    return JsonResponse({'removed': calendars})
 
 
 # ---- Manage training logs (supervisors and superusers) ----
