@@ -32,11 +32,11 @@
 
 <hr>
 
-<h4>Assign item(s) to calendar list(s)</h4>
+<h4>Add item(s) to calendar list(s)</h4>
 <form method="post">
   {% csrf_token %}
   {{ form.as_p }}
-  <button type="submit" class="btn btn-primary">Assign</button>
+  <button type="submit" class="btn btn-primary">Add item(s)</button>
 </form>
 
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
