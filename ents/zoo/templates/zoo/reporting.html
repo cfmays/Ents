@@ -24,9 +24,9 @@
       <td>{{ entry.animal|default:"" }}</td>
       <td>{{ entry.item }}</td>
       <td>{{ entry.behavior_goal|default:"" }}</td>
-      <td>{{ entry.get_do_score_display|default:"" }}</td>
-      <td>{{ entry.get_io_score_display|default:"" }}</td>
-      <td>{{ entry.get_gbs_score_display|default:"" }}</td>
+      <td>{{ entry.do_score|default_if_none:"" }}</td>
+      <td>{{ entry.io_score|default_if_none:"" }}</td>
+      <td>{{ entry.gbs_score }}</td>
       <td>{{ entry.notes }}</td>
     </tr>
     {% empty %}

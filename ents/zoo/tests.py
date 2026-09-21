@@ -273,6 +273,17 @@ class KeeperAccessScopingTests(TestCase):
             CalendarEntry.objects.create(asg=self.asg, date=f'2026-09-0{day}', item=item)
         self.assertEqual(rows(), (7, 1))      # never fewer than 1 blank row
 
+    def test_history_shows_just_the_score_codes(self):
+        item = Enrichment.objects.create(name='Ball', photo=make_image_file(name='ball.png'))
+        CalendarEntry.objects.create(asg=self.asg, date='2026-09-02', item=item, do_score=0, io_score=3, gbs_score='G')
+        self.client.force_login(self.assigned_keeper)
+        page = self.client.get(reverse('zoo:reporting_view', args=[self.asg.id]))
+        self.assertContains(page, '<td>0</td>')   # a zero score still shows
+        self.assertContains(page, '<td>3</td>')
+        self.assertContains(page, '<td>G</td>')
+        for explanation in ('High Response', 'No Response', 'Goal behavior achieved'):
+            self.assertNotContains(page, explanation)
+
     def test_history_hides_entries_dated_after_today(self):
         past = Enrichment.objects.create(name='Past ball', photo=make_image_file(name='p.png'))
         today = Enrichment.objects.create(name='Today ball', photo=make_image_file(name='t.png'))
