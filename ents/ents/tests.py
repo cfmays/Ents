@@ -1,7 +1,9 @@
 import os
 import io
+import pathlib
 import shutil
 import tempfile
+from unittest import mock
 
 from PIL import Image
 
@@ -304,6 +306,83 @@ class ItemsMasterListPrintTests(TestCase):
         self.assertContains(page, item.photo.url)
         self.assertContains(page, 'Bare Item')
         self.assertContains(page, '&mdash;')  # no calendars for the bare item
+
+
+@override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
+class UnassignedPhotosTests(TestCase):
+    """The temporary 'add an item from a server-side photo, no re-upload' section on Manage Items."""
+
+    def setUp(self):
+        self.source_dir = tempfile.mkdtemp(prefix='ents_unassigned_source_')
+        self.addCleanup(shutil.rmtree, self.source_dir, ignore_errors=True)
+        self.patcher = mock.patch('ents.views.UNASSIGNED_PHOTOS_DIR', pathlib.Path(self.source_dir))
+        self.patcher.start()
+        self.addCleanup(self.patcher.stop)
+
+        with open(os.path.join(self.source_dir, 'Cool_new_toy.jpg'), 'wb') as f:
+            f.write(make_image_file().read())
+        with open(os.path.join(self.source_dir, 'notes.txt'), 'w') as f:
+            f.write('not a photo')
+
+        self.supervisor = User.objects.create_user('sup_unassigned', password='pw')
+        self.supervisor.groups.add(Group.objects.get_or_create(name='Supervisor')[0])
+        self.keeper = User.objects.create_user('keeper_unassigned', password='pw')
+        self.url = reverse('createView')
+
+    def test_only_supervisors_see_the_section_and_can_use_it(self):
+        self.client.login(username='keeper_unassigned', password='pw')
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+
+        self.client.login(username='sup_unassigned', password='pw')
+        page = self.client.get(self.url)
+        self.assertContains(page, 'Cool_new_toy.jpg')
+        self.assertContains(page, 'Temporary')
+        self.assertNotContains(page, 'notes.txt')  # not an image, so not offered
+
+    def test_add_item_from_unassigned_photo_without_reuploading(self):
+        self.client.login(username='sup_unassigned', password='pw')
+        response = self.client.post(self.url, {
+            'action': 'add_from_unassigned', 'unassigned_file': 'Cool_new_toy.jpg', 'unassigned_name': 'Cool New Toy',
+        })
+        new_item = Enrichment.objects.get(name='Cool New Toy')
+        self.assertRedirects(response, f'{self.url}?item={new_item.id}')
+        self.assertTrue(new_item.photo)
+        self.assertTrue(os.path.exists(new_item.photo.path))
+
+        # the file is no longer offered once it has become an item's photo
+        self.assertEqual(self.client.get(self.url).context['unassigned_photos'], [])
+
+    def test_refuses_duplicate_name_and_missing_name(self):
+        Enrichment.objects.create(name='Existing Item', photo=make_image_file(name='e.png'))
+        self.client.login(username='sup_unassigned', password='pw')
+        self.client.post(self.url, {'action': 'add_from_unassigned', 'unassigned_file': 'Cool_new_toy.jpg', 'unassigned_name': 'existing item'})
+        self.assertFalse(Enrichment.objects.filter(name='Cool New Toy').exists())
+        self.assertEqual(Enrichment.objects.filter(photo__contains='Cool_new_toy').count(), 0)
+
+        self.client.post(self.url, {'action': 'add_from_unassigned', 'unassigned_file': 'Cool_new_toy.jpg', 'unassigned_name': ''})
+        self.assertEqual(Enrichment.objects.count(), 1)  # still just 'Existing Item'
+
+    def test_cannot_escape_the_source_directory(self):
+        self.client.login(username='sup_unassigned', password='pw')
+        # a "/" in the URL segment is rejected by the URL pattern itself (never reaches the view)
+        self.assertEqual(self.client.get('/unassigned-photo/..%2Fsettings.py/').status_code, 404)
+        # ".." alone is one path segment (allowed by the URL pattern) but resolves to a directory, not a file
+        response = self.client.get(reverse('unassignedPhotoPreview', args=['..']))
+        self.assertEqual(response.status_code, 404)
+        # the POST action only ever accepts a bare filename that's in today's unassigned list
+        response = self.client.post(self.url, {
+            'action': 'add_from_unassigned', 'unassigned_file': '../../ents/settings.py', 'unassigned_name': 'Sneaky',
+        })
+        self.assertFalse(Enrichment.objects.filter(name='Sneaky').exists())
+
+    def test_keeper_cannot_preview_or_add(self):
+        self.client.login(username='keeper_unassigned', password='pw')
+        self.assertEqual(self.client.get(reverse('unassignedPhotoPreview', args=['Cool_new_toy.jpg'])).status_code, 403)
+        response = self.client.post(self.url, {
+            'action': 'add_from_unassigned', 'unassigned_file': 'Cool_new_toy.jpg', 'unassigned_name': 'Sneaky',
+        })
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(Enrichment.objects.filter(name='Sneaky').exists())
 
 
 class LogoutViewTests(TestCase):

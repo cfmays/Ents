@@ -78,6 +78,32 @@
 {% endif %}
 
 <hr>
+<h4>Unassigned photos <span class="text-muted" style="font-size:0.9rem; font-weight:normal">(Temporary)</span></h4>
+<p class="text-muted small">
+  Photo files already on the server that aren't attached to any item yet ({{ unassigned_photos|length }} left).
+  Type a name and click Add item &mdash; the file doesn't need to be uploaded again.
+  Remove this section once every one of these has been handled.
+</p>
+{% if unassigned_photos %}
+<div class="row">
+  {% for photo in unassigned_photos %}
+  <div class="col-auto text-center mb-3" style="width:130px">
+    <img src="{% url 'unassignedPhotoPreview' photo.filename %}" style="height:90px;width:90px;object-fit:cover;border-radius:4px;" alt="">
+    <div class="text-muted small" style="word-break:break-all">{{ photo.filename }}</div>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="unassigned_file" value="{{ photo.filename }}">
+      <input type="text" name="unassigned_name" value="{{ photo.suggested_name }}" maxlength="255" class="form-control form-control-sm mt-1">
+      <button type="submit" name="action" value="add_from_unassigned" class="btn btn-sm btn-secondary mt-1">Add item</button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<p><em>None left.</em></p>
+{% endif %}
+
+<hr>
 <h4>Add a new item</h4>
 <form method="post" enctype="multipart/form-data">{% csrf_token %}
   {{ form.as_p }}

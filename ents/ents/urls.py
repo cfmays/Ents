@@ -30,6 +30,7 @@ urlpatterns = [
     path('',views.index, name='index'),
     path('create/', views.EnrichmentUploadView, name='createView'),
     path('master-list/print/', views.items_master_list_print, name='items_master_list_print'),
+    path('unassigned-photo/<str:filename>/', views.unassigned_photo_preview, name='unassignedPhotoPreview'),
     path('logout/', views.logout_view, name='logout'),
     path('login/', auth_views.LoginView.as_view(), name='login'),
     path('password/', auth_views.PasswordChangeView.as_view(

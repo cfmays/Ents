@@ -1,5 +1,12 @@
+import os
+import re
+from pathlib import Path
+
+from django.conf import settings
 from django.contrib import messages
+from django.core.files import File
 from django.core.files.storage import default_storage
+from django.http import FileResponse, Http404
 from django.http.response import JsonResponse
 from django.shortcuts import render
 from .models import Enrichment
@@ -11,6 +18,63 @@ from .settings import MEDIA_URL
 from zoo.forms import ItemAssignmentForm
 from zoo.models import ASGApprovedItem, default_is_food
 from zoo.permissions import division_scope, supervisor_required
+
+# Where Charles put the exported photo files for Carolyn to review (dev machine only,
+# not part of the deployed app or git). "Temporary" section at the bottom of Manage
+# Items reads from here so she can add an item without re-uploading a file she already
+# has. Delete this whole block, its two views, the two URLs, and the template section
+# once she's gone through them all.
+UNASSIGNED_PHOTOS_DIR = Path(settings.BASE_DIR).parent / 'enrichments'
+UNASSIGNED_PHOTO_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp'}
+
+
+def _unassigned_photo_files():
+    """Photo files on disk that aren't the photo of any current item."""
+    if not UNASSIGNED_PHOTOS_DIR.is_dir():
+        return []
+    used_stems = {Path(e.photo.name).stem for e in Enrichment.objects.exclude(photo='')}
+    files = []
+    for name in sorted(os.listdir(UNASSIGNED_PHOTOS_DIR)):
+        stem, ext = os.path.splitext(name)
+        if ext.lower() not in UNASSIGNED_PHOTO_EXTENSIONS:
+            continue
+        if any(u == stem or u.startswith(stem + '_') for u in used_stems):
+            continue
+        suggested = re.sub(r'[_\-]+', ' ', stem).strip()
+        files.append({'filename': name, 'suggested_name': suggested})
+    return files
+
+
+@supervisor_required
+def unassigned_photo_preview(request, filename):
+    """Streams one file from UNASSIGNED_PHOTOS_DIR, for the thumbnails in that section."""
+    if filename != os.path.basename(filename):
+        raise Http404
+    path = UNASSIGNED_PHOTOS_DIR / filename
+    if path.resolve().parent != UNASSIGNED_PHOTOS_DIR.resolve() or not path.is_file():
+        raise Http404
+    return FileResponse(open(path, 'rb'))
+
+
+def _add_from_unassigned(request):
+    manage = reverse('createView')
+    filename = request.POST.get('unassigned_file', '')
+    name = ' '.join(request.POST.get('unassigned_name', '').split())
+    available = {f['filename'] for f in _unassigned_photo_files()}
+    if filename not in available:
+        messages.warning(request, 'That photo is no longer available (maybe it was just added by someone else).')
+    elif not name:
+        messages.warning(request, 'Enter a name for the new item.')
+    elif Enrichment.objects.filter(name__iexact=name).exists():
+        messages.warning(request, f'An item named "{name}" already exists.')
+    else:
+        new_item = Enrichment.objects.create(name=name)
+        with open(UNASSIGNED_PHOTOS_DIR / filename, 'rb') as fh:
+            new_item.photo.save(filename, File(fh), save=True)
+        messages.success(request, f'Added {name}.')
+        return HttpResponseRedirect(f'{manage}?item={new_item.id}')
+    return HttpResponseRedirect(manage)
+
 
 
 def count_text(n):
@@ -84,6 +148,8 @@ def EnrichmentUploadView(request):
     assign_form = ItemAssignmentForm(divisions=division_scope(request))
     if request.method == 'POST' and action in ('rename', 'photo', 'delete'):
         return _manage_item(request, item, action)
+    if request.method == 'POST' and action == 'add_from_unassigned':
+        return _add_from_unassigned(request)
     if request.method == 'POST' and action == 'add_to_lists':
         assign_form = ItemAssignmentForm(request.POST, divisions=division_scope(request))
         if assign_form.is_valid():
@@ -97,7 +163,7 @@ def EnrichmentUploadView(request):
         form = CreateEnrichmentForm()
         return render(request, 'createEnrichment.html', {
             'form': form, 'item': item, 'items': Enrichment.objects.all(), 'calendars': 0, 'entries': 0,
-            'assign_form': assign_form,
+            'assign_form': assign_form, 'unassigned_photos': _unassigned_photo_files(),
         })
 
     if request.method == 'POST':
@@ -119,6 +185,7 @@ def EnrichmentUploadView(request):
         'calendars': calendars,
         'entries': entries,
         'assign_form': assign_form,
+        'unassigned_photos': _unassigned_photo_files(),
     })
 
 def logout_view(request):
