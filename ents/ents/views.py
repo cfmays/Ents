@@ -26,6 +26,14 @@ def index(request):
 
 
 
+@supervisor_required
+def items_master_list_print(request):
+    """Printable master list: every item, its thumbnail, and the calendars (if any) it is approved on."""
+    items = Enrichment.objects.select_related('category').prefetch_related('asg_assignments__asg').order_by('name')
+    rows = [(item, sorted({a.asg.name for a in item.asg_assignments.all()})) for item in items]
+    return render(request, 'items_master_list_print.html', {'rows': rows})
+
+
 def _manage_item(request, item, action):
     """Rename, replace the photo of, or delete the selected item; then go back to the Manage Items page."""
     manage = reverse('createView')

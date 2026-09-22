@@ -271,6 +271,41 @@ class ChangePasswordTests(TestCase):
         self.assertTrue(self.user.check_password('1957'))
 
 
+@override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
+class ItemsMasterListPrintTests(TestCase):
+
+    def setUp(self):
+        self.supervisor = User.objects.create_user(username='sup_print', password='password123')
+        self.supervisor.groups.add(Group.objects.get_or_create(name='Supervisor')[0])
+        self.url = reverse('items_master_list_print')
+
+    def test_link_and_page_are_for_supervisors_only(self):
+        keeper = User.objects.create_user(username='keeper_print', password='password123')
+        self.client.login(username='keeper_print', password='password123')
+        self.assertNotContains(self.client.get(reverse('index')), 'Print Master List')
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+
+        self.client.login(username='sup_print', password='password123')
+        self.assertContains(self.client.get(reverse('index')), 'Print Master List')
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+
+    def test_shows_thumbnail_and_calendars_for_each_item(self):
+        from zoo.models import ASG, ASGApprovedItem, String
+        string = String.objects.create(name='Test String')
+        asg = ASG.objects.create(name='Tiger', string=string)
+        item = Enrichment.objects.create(name='Ball', photo=make_image_file(name='ball.png'))
+        ASGApprovedItem.objects.create(asg=asg, item=item)
+        no_photo = Enrichment.objects.create(name='Bare Item')
+
+        self.client.login(username='sup_print', password='password123')
+        page = self.client.get(self.url)
+        self.assertContains(page, 'Ball')
+        self.assertContains(page, 'Tiger')
+        self.assertContains(page, item.photo.url)
+        self.assertContains(page, 'Bare Item')
+        self.assertContains(page, '&mdash;')  # no calendars for the bare item
+
+
 class LogoutViewTests(TestCase):
 
     def test_logout_redirects_to_index(self):

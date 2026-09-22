@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Enrichment Items &mdash; Master List</title>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 13px; margin: 20px; color: #000; }
+    h1 { font-size: 22px; margin: 0 0 8px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    th, td { border: 1px solid #555; padding: 4px 6px; text-align: left; vertical-align: middle; }
+    th { background: #eee; }
+    tr { page-break-inside: avoid; }
+    .item { display: flex; align-items: center; gap: 8px; }
+    .item img { height: 40px; width: 40px; object-fit: cover; flex-shrink: 0; }
+    .screen-only { margin-bottom: 12px; }
+    @media print { .screen-only { display: none; } body { margin: 0; } }
+  </style>
+</head>
+<body>
+  <div class="screen-only">
+    <button onclick="window.print()">Print</button>
+    <a href="{% url 'index' %}">Back to Enrichment Items</a>
+    &middot; {{ rows|length }} items
+  </div>
+
+  <h1>Enrichment Items &mdash; Master List</h1>
+
+  <table>
+    <thead>
+      <tr><th>Item</th><th>Category</th><th>Calendars</th></tr>
+    </thead>
+    <tbody>
+      {% for item, calendars in rows %}
+      <tr>
+        <td>
+          <div class="item">
+            {% if item.photo %}<img src="{{ item.photo.url }}" alt="">{% endif %}
+            <span>{{ item.name }}</span>
+          </div>
+        </td>
+        <td>{{ item.category|default:"" }}</td>
+        <td>{% for name in calendars %}{{ name }}{% if not forloop.last %}, {% endif %}{% empty %}&mdash;{% endfor %}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="3"><em>No items.</em></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <script>window.addEventListener("load", function () { window.print(); });</script>
+</body>
+</html>
