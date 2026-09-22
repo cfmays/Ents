@@ -125,6 +125,13 @@
 
         <button type="submit" name="do" value="delete_animal:{{ animal.id }}" class="btn btn-sm btn-outline-danger mb-2"
                 onclick="return confirm('Delete {{ animal.name|escapejs }} and its {{ animal.n_sessions }} logged training session{{ animal.n_sessions|pluralize }}? This cannot be undone.');">Delete animal</button>
+        {% if strings|length > 1 %}
+        <select name="move_animal_to_{{ animal.id }}" class="form-select form-select-sm d-inline-block" style="width:auto">
+          {% for other in strings %}{% if other.id != string.id %}<option value="{{ other.id }}">{{ other.name }}</option>{% endif %}{% endfor %}
+        </select>
+        <button type="submit" name="do" value="move_animal:{{ animal.id }}" class="btn btn-sm btn-secondary mb-2"
+                onclick="return confirm('Move {{ animal.name|escapejs }} to the string chosen in the dropdown?');">Move to</button>
+        {% endif %}
       </details>
       {% empty %}<p><em>None</em></p>{% endfor %}
 

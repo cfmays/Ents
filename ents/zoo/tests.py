@@ -780,6 +780,21 @@ class ManageTrainingTests(TestCase):
         self.post(f'delete_animal:{nety.id}')
         self.assertFalse(TrainingAnimal.objects.filter(pk=nety.id).exists())
 
+    def test_move_animal_to_another_string(self):
+        self.client.force_login(self.supervisor)
+        another = String.objects.create(name='String C', division=self.division_a)
+        self.post(f'move_animal:{self.animal.id}', **{f'move_animal_to_{self.animal.id}': another.id})
+        self.animal.refresh_from_db()
+        self.assertEqual(self.animal.string, another)
+        response = self.post(f'move_animal:{self.animal.id}', **{f'move_animal_to_{self.animal.id}': another.id})
+        self.assertContains(response, 'already on')  # moving to its own string again is a no-op with a message
+
+    def test_move_animal_destination_is_limited_to_the_supervisors_divisions(self):
+        self.client.force_login(self.supervisor)
+        self.assertEqual(self.client.post(self.url, {'do': f'move_animal:{self.animal.id}', f'move_animal_to_{self.animal.id}': self.string_b.id}).status_code, 404)
+        self.animal.refresh_from_db()
+        self.assertEqual(self.animal.string, self.string_a)
+
     def test_behaviors_reinforcers_and_move_to_maintenance(self):
         self.client.force_login(self.supervisor)
         aid = self.animal.id

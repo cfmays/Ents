@@ -564,6 +564,18 @@ def _add_animal(request, strings, string_id):
         messages.success(request, f'Added {name} to {string.name}.')
 
 
+def _move_animal(request, strings, animal_id):
+    animal = _animal_for(strings, animal_id)
+    destination = get_object_or_404(strings, pk=request.POST.get(f'move_animal_to_{animal.id}') or None)
+    if destination.pk == animal.string_id:
+        messages.warning(request, f'{animal.name} is already on {destination.name}.')
+        return
+    old_string = animal.string
+    animal.string = destination
+    animal.save()
+    messages.success(request, f'Moved {animal.name} from {old_string.name} to {destination.name}.')
+
+
 def _delete_animal(request, strings, animal_id):
     animal = _animal_for(strings, animal_id)
     animal.delete()
@@ -625,7 +637,7 @@ MANAGE_ACTIONS = {
     'add_string': _add_string, 'rename_string': _rename_string, 'set_division': _set_division,
     'delete_string': _delete_string, 'add_keeper': _add_keeper, 'remove_keeper': _remove_keeper,
     'reset_password': _reset_password,
-    'add_animal': _add_animal, 'delete_animal': _delete_animal,
+    'add_animal': _add_animal, 'move_animal': _move_animal, 'delete_animal': _delete_animal,
     'add_behavior': _add_behavior, 'remove_behavior': _remove_behavior, 'move_behavior': _move_behavior,
     'add_reinforcer': _add_reinforcer, 'remove_reinforcer': _remove_reinforcer,
 }
