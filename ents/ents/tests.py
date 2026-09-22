@@ -233,6 +233,44 @@ class ManageItemsTests(TestCase):
         self.assertTrue(Enrichment.objects.filter(pk=self.item.pk).exists())
 
 
+class ChangePasswordTests(TestCase):
+
+    def setUp(self):
+        self.user = User.objects.create_user(username='keeper9', password='1957')
+
+    def test_change_password_requires_login(self):
+        response = self.client.get(reverse('password_change'))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse('login'), response.url)
+
+    def test_menu_link_and_page_for_any_logged_in_user(self):
+        self.client.login(username='keeper9', password='1957')
+        self.assertContains(self.client.get(reverse('index')), 'Change password')
+        self.assertContains(self.client.get(reverse('password_change')), 'Old password')
+
+    def test_user_can_change_their_own_password(self):
+        self.client.login(username='keeper9', password='1957')
+        response = self.client.post(reverse('password_change'), {
+            'old_password': '1957', 'new_password1': 'Zebra-Stripes-42', 'new_password2': 'Zebra-Stripes-42',
+        })
+        self.assertRedirects(response, reverse('password_change_done'))
+        self.assertContains(self.client.get(reverse('password_change_done')), 'Password changed')
+        self.client.logout()
+        self.assertFalse(self.client.login(username='keeper9', password='1957'))
+        self.assertTrue(self.client.login(username='keeper9', password='Zebra-Stripes-42'))
+
+    def test_wrong_old_password_or_mismatched_new_ones_change_nothing(self):
+        self.client.login(username='keeper9', password='1957')
+        self.client.post(reverse('password_change'), {
+            'old_password': 'wrong', 'new_password1': 'Zebra-Stripes-42', 'new_password2': 'Zebra-Stripes-42',
+        })
+        self.client.post(reverse('password_change'), {
+            'old_password': '1957', 'new_password1': 'Zebra-Stripes-42', 'new_password2': 'different-one',
+        })
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password('1957'))
+
+
 class LogoutViewTests(TestCase):
 
     def test_logout_redirects_to_index(self):

@@ -1,4 +1,5 @@
 {% extends "base_generic.html" %}
+{% load zoo_extras %}
 
 {% block content %}
 <style>
@@ -63,6 +64,10 @@
       <ul class="mt-list">
         {% for keeper in string.keepers.all %}
         <li>{{ keeper.username|capfirst }}
+          {% if not keeper.is_staff and not keeper|is_supervisor %}
+          <button type="submit" name="do" value="reset_password:{{ string.id }}:{{ keeper.id }}" class="btn btn-link btn-sm link-btn"
+                  onclick="return confirm('Give {{ keeper.username|capfirst|escapejs }} a new temporary password? Their current password will stop working.');">reset password</button>
+          {% endif %}
           <button type="submit" name="do" value="remove_keeper:{{ string.id }}:{{ keeper.id }}" class="btn btn-link btn-sm text-danger link-btn">remove</button></li>
         {% empty %}<li><em>None</em></li>{% endfor %}
       </ul>

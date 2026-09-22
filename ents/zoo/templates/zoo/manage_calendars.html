@@ -1,0 +1,96 @@
+{% extends "base_generic.html" %}
+
+{% block content %}
+<style>
+  details.string-box { border: 1px solid #c9bd9c; border-radius: 6px; padding: 6px 10px; margin-bottom: 8px; background: #f8f0d8; }
+  details > summary { cursor: pointer; }
+  .mt-list { list-style: none; padding-left: 0; margin-bottom: 6px; }
+  .mt-list li { padding: 1px 0; }
+  .add-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .add-row input { max-width: 320px; }
+  .link-btn { padding: 0 4px; }
+</style>
+
+<h1>Manage calendars</h1>
+<p><a href="{% url 'zoo:asg_list' %}">Back to Enrichment Calendars</a></p>
+
+<form method="post" id="manage-calendars-form">
+  {% csrf_token %}
+
+  {% for string in strings %}
+  <details class="string-box" id="string-{{ string.id }}">
+    <summary>
+      <strong>{{ string.name }}</strong>
+      <span class="text-muted small">{{ string.asgs.all|length }} calendar{{ string.asgs.all|length|pluralize }}</span>
+    </summary>
+
+    <div class="mt-2">
+      <ul class="mt-list">
+        {% for asg in string.asgs.all %}
+        <li>
+          <a href="{% url 'zoo:calendar_tab' asg.id %}">{{ asg.name }}</a>
+          <input type="text" name="rename_calendar_{{ asg.id }}" value="{{ asg.name }}" class="form-control form-control-sm d-inline-block" style="width:220px">
+          <button type="submit" name="do" value="rename_calendar:{{ asg.id }}" class="btn btn-sm btn-secondary">Rename</button>
+          <button type="submit" name="do" value="delete_calendar:{{ asg.id }}" class="btn btn-link btn-sm text-danger link-btn"
+                  onclick="return confirm('Delete the calendar {{ asg.name|escapejs }}? (Only possible when it has no saved calendar entries.)');">delete</button>
+          {% if strings|length > 1 %}
+          <select name="move_to_{{ asg.id }}" class="form-select form-select-sm d-inline-block" style="width:auto">
+            {% for other in strings %}{% if other.id != string.id %}<option value="{{ other.id }}">{{ other.name }}</option>{% endif %}{% endfor %}
+          </select>
+          <button type="submit" name="do" value="move_calendar:{{ asg.id }}" class="btn btn-link btn-sm link-btn"
+                  onclick="return confirm('Move {{ asg.name|escapejs }} to the string chosen in the dropdown?');">move</button>
+          {% endif %}
+        </li>
+        {% empty %}<li><em>No calendars yet</em></li>{% endfor %}
+      </ul>
+      <div class="add-row" data-add-group>
+        <input type="text" name="new_calendar_{{ string.id }}" class="form-control form-control-sm" placeholder="Add a calendar (e.g. Tiger)">
+        <button type="submit" name="do" value="add_calendar:{{ string.id }}" class="btn btn-sm btn-secondary">Add calendar</button>
+      </div>
+      {% if string.asgs.all %}
+      <div class="add-row" data-add-group>
+        <input type="text" name="new_calendar_from_{{ string.id }}" class="form-control form-control-sm" placeholder="Name for the new calendar">
+        <button type="submit" name="do" value="add_calendar_from:{{ string.id }}" class="btn btn-sm btn-secondary">Add calendar from</button>
+        <select name="copy_from_{{ string.id }}" class="form-select form-select-sm" style="width:auto">
+          {% for asg in string.asgs.all %}<option value="{{ asg.id }}">{{ asg.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <p class="text-muted small" style="margin-top:-4px">Copies special concerns, behavior goals, notes and approved items from the chosen calendar.</p>
+      {% endif %}
+    </div>
+  </details>
+  {% empty %}
+  <p><em>No strings to manage.</em></p>
+  {% endfor %}
+</form>
+
+<script>
+  var form = document.getElementById("manage-calendars-form");
+
+  // Enter in a box presses that box's own button, never some other button on the page
+  form.addEventListener("keydown", function (event) {
+    if (event.key !== "Enter" || event.target.tagName === "BUTTON") { return; }
+    event.preventDefault();
+    var group = event.target.closest("[data-add-group]");
+    var button = group && group.querySelector("button[name=do]");
+    if (button) { button.click(); }
+  });
+
+  // after a change the page reloads: reopen the sections that were open and keep the scroll position
+  form.addEventListener("submit", function () {
+    var open = Array.from(document.querySelectorAll("details[open]")).map(function (d) { return d.id; });
+    try {
+      sessionStorage.setItem("manageCalendarsOpen", JSON.stringify(open));
+      sessionStorage.setItem("manageCalendarsScroll", String(window.scrollY));
+    } catch (e) {}
+  });
+  try {
+    var openIds = JSON.parse(sessionStorage.getItem("manageCalendarsOpen") || "[]");
+    var scroll = sessionStorage.getItem("manageCalendarsScroll");
+    sessionStorage.removeItem("manageCalendarsOpen");
+    sessionStorage.removeItem("manageCalendarsScroll");
+    openIds.forEach(function (id) { var d = document.getElementById(id); if (d) { d.open = true; } });
+    if (scroll !== null) { window.scrollTo({ top: parseInt(scroll, 10), behavior: "instant" }); }
+  } catch (e) {}
+</script>
+{% endblock %}

@@ -742,6 +742,35 @@ class ManageTrainingTests(TestCase):
         self.post(f'remove_keeper:{self.string_a.id}:{self.keeper.id}')
         self.assertFalse(self.string_a.keepers.exists())
 
+    def test_supervisor_can_reset_a_keepers_password(self):
+        self.keeper.set_password('1957')
+        self.keeper.save()
+        self.string_a.keepers.add(self.keeper)
+        self.client.force_login(self.supervisor)
+        response = self.post(f'reset_password:{self.string_a.id}:{self.keeper.id}')
+        self.keeper.refresh_from_db()
+        self.assertFalse(self.keeper.check_password('1957'))
+        message = [str(m) for m in response.context['messages']][0]
+        temporary = message.split(': ')[1].split(' ')[0]
+        self.assertEqual(len(temporary), 8)
+        self.assertTrue(self.keeper.check_password(temporary))   # the password shown is the new one
+        self.assertContains(response, 'reset password')
+        self.string_a.keepers.add(self.supervisor)
+        page = self.client.get(self.url)
+        self.assertContains(page, f'reset_password:{self.string_a.id}:{self.keeper.id}')
+        self.assertNotContains(page, f'reset_password:{self.string_a.id}:{self.supervisor.id}')  # no link for supervisors
+
+    def test_password_reset_is_limited_to_keepers_in_the_supervisors_strings(self):
+        other_keeper = User.objects.create_user('other', password='1957')
+        self.string_b.keepers.add(other_keeper)               # a string in another division
+        self.string_a.keepers.add(self.supervisor)            # a supervisor listed as a keeper
+        self.client.force_login(self.supervisor)
+        self.assertEqual(self.client.post(self.url, {'do': f'reset_password:{self.string_b.id}:{other_keeper.id}'}).status_code, 404)
+        self.assertEqual(self.client.post(self.url, {'do': f'reset_password:{self.string_a.id}:{self.supervisor.id}'}).status_code, 403)
+        self.assertEqual(self.client.post(self.url, {'do': f'reset_password:{self.string_a.id}:{self.keeper.id}'}).status_code, 404)  # not this string's keeper
+        other_keeper.refresh_from_db()
+        self.assertTrue(other_keeper.check_password('1957'))
+
     def test_animals_add_and_delete(self):
         self.client.force_login(self.supervisor)
         self.post(f'add_animal:{self.string_a.id}', **{f'new_animal_{self.string_a.id}': 'Nety'})
@@ -838,3 +867,129 @@ class WorkingDivisionTests(TestCase):
         response = self.client.post(reverse('zoo:set_divisions'), {'division': [self.aquatic.id], 'next': 'https://evil.example/'})
         self.assertRedirects(response, reverse('zoo:asg_list'))
         self.assertNotContains(self.client.get(reverse('zoo:asg_list')), 'Penguin String')
+
+
+@override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
+class ManageCalendarsTests(TestCase):
+
+    def setUp(self):
+        self.division_a = Division.objects.create(name='Terrestrial')
+        self.division_b = Division.objects.create(name='Aquatic')
+        self.string_a = String.objects.create(name='String A', division=self.division_a)
+        self.string_b = String.objects.create(name='String B', division=self.division_b)
+        self.asg = ASG.objects.create(name='Tiger', string=self.string_a)
+
+        group, _ = Group.objects.get_or_create(name='Supervisor')
+        self.supervisor = User.objects.create_user('super_cal', password='pw', is_staff=True)
+        self.supervisor.groups.add(group)
+        self.supervisor.profile.divisions.add(self.division_a)
+        self.superuser = User.objects.create_superuser('rootc', 'r@example.com', 'pw')
+        self.keeper = User.objects.create_user('keeper_cal', password='pw')
+        self.url = reverse('zoo:manage_calendars')
+
+    def post(self, do, **data):
+        return self.client.post(self.url, {'do': do, **data}, follow=True)
+
+    def test_link_and_page_are_for_supervisors_only(self):
+        list_url = reverse('zoo:asg_list')
+        self.client.force_login(self.keeper)
+        self.assertNotContains(self.client.get(list_url), 'Manage Calendars')
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+        self.client.force_login(self.supervisor)
+        self.assertContains(self.client.get(list_url), 'Manage Calendars')
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+
+    def test_supervisor_only_sees_and_changes_own_division(self):
+        other_asg = ASG.objects.create(name='Penguin', string=self.string_b)
+        self.client.force_login(self.supervisor)
+        page = self.client.get(self.url)
+        self.assertContains(page, 'String A')
+        self.assertNotContains(page, 'String B')
+        self.assertEqual(self.client.post(self.url, {'do': f'add_calendar:{self.string_b.id}', f'new_calendar_{self.string_b.id}': 'X'}).status_code, 404)
+        self.assertEqual(self.client.post(self.url, {'do': f'delete_calendar:{other_asg.id}'}).status_code, 404)
+        self.assertTrue(ASG.objects.filter(pk=other_asg.pk).exists())
+
+    def test_add_rename_and_delete_calendar(self):
+        self.client.force_login(self.supervisor)
+        self.post(f'add_calendar:{self.string_a.id}', **{f'new_calendar_{self.string_a.id}': 'Maned Wolf'})
+        wolf = ASG.objects.get(name='Maned Wolf')
+        self.assertEqual(wolf.string, self.string_a)
+        self.assertContains(self.post(f'add_calendar:{self.string_a.id}', **{f'new_calendar_{self.string_a.id}': 'tiger'}), 'already exists')
+
+        self.post(f'rename_calendar:{wolf.id}', **{f'rename_calendar_{wolf.id}': 'Red Wolf'})
+        wolf.refresh_from_db()
+        self.assertEqual(wolf.name, 'Red Wolf')
+        self.assertContains(self.post(f'rename_calendar:{wolf.id}', **{f'rename_calendar_{wolf.id}': 'tiger'}), 'already exists')
+
+        self.post(f'delete_calendar:{wolf.id}')
+        self.assertFalse(ASG.objects.filter(pk=wolf.pk).exists())
+
+    def test_add_calendar_from_copies_concerns_notes_and_items(self):
+        concern = SpecialConcern.objects.create(text='Watch closely')
+        self.asg.special_concerns.add(concern)
+        self.asg.notes = 'Do not feed after dark'
+        self.asg.save()
+        item = Enrichment.objects.create(name='Ball', photo=make_image_file(name='ball.png'))
+        ASGApprovedItem.objects.create(asg=self.asg, item=item, is_food=False, comments='Watch it', rate='3')
+        food = Enrichment.objects.create(name='Grapes', photo=make_image_file(name='g.png'))
+        ASGApprovedItem.objects.create(asg=self.asg, item=food, is_food=True)
+        goal = BehaviorGoal.objects.create(name='Roll')
+        self.asg.behavior_goals.add(goal)
+
+        self.client.force_login(self.supervisor)
+        self.post(f'add_calendar_from:{self.string_a.id}', **{
+            f'new_calendar_from_{self.string_a.id}': 'Tiger Two', f'copy_from_{self.string_a.id}': self.asg.id,
+        })
+        clone = ASG.objects.get(name='Tiger Two')
+        self.assertEqual(clone.string, self.string_a)
+        self.assertEqual(clone.notes, 'Do not feed after dark')
+        self.assertEqual(list(clone.special_concerns.values_list('text', flat=True)), ['Watch closely'])
+        self.assertEqual(list(clone.behavior_goals.values_list('name', flat=True)), ['Roll'])
+        rows = {a.item.name: a for a in clone.item_assignments.all()}
+        self.assertEqual((rows['Ball'].is_food, rows['Ball'].comments, rows['Ball'].rate), (False, 'Watch it', '3'))
+        self.assertTrue(rows['Grapes'].is_food)
+        # the original calendar is untouched, and animal choices are not copied
+        self.assertEqual(self.asg.item_assignments.count(), 2)
+        self.assertFalse(clone.animals.exists())
+
+    def test_add_calendar_from_requires_a_name_and_a_source(self):
+        self.client.force_login(self.supervisor)
+        response = self.post(f'add_calendar_from:{self.string_a.id}', **{f'copy_from_{self.string_a.id}': self.asg.id})
+        self.assertContains(response, 'Enter a name')
+        self.assertFalse(ASG.objects.filter(string=self.string_a).exclude(pk=self.asg.pk).exists())
+
+        empty_string = String.objects.create(name='Empty String', division=self.division_a)
+        response = self.post(f'add_calendar_from:{empty_string.id}', **{f'new_calendar_from_{empty_string.id}': 'X'})
+        self.assertContains(response, 'Choose a calendar to copy from')
+
+    def test_move_calendar_to_another_string(self):
+        self.client.force_login(self.supervisor)
+        another = String.objects.create(name='String C', division=self.division_a)
+        self.post(f'move_calendar:{self.asg.id}', **{f'move_to_{self.asg.id}': another.id})
+        self.asg.refresh_from_db()
+        self.assertEqual(self.asg.string, another)
+        response = self.post(f'move_calendar:{self.asg.id}', **{f'move_to_{self.asg.id}': another.id})
+        self.assertContains(response, 'already on')  # moving to its own string again is a no-op with a message
+
+    def test_move_calendar_destination_is_limited_to_the_supervisors_divisions(self):
+        self.client.force_login(self.supervisor)
+        self.assertEqual(self.client.post(self.url, {'do': f'move_calendar:{self.asg.id}', f'move_to_{self.asg.id}': self.string_b.id}).status_code, 404)
+        self.asg.refresh_from_db()
+        self.assertEqual(self.asg.string, self.string_a)
+
+    def test_delete_refused_when_calendar_has_saved_entries(self):
+        item = Enrichment.objects.create(name='Ball', photo=make_image_file(name='ball.png'))
+        CalendarEntry.objects.create(asg=self.asg, date='2026-09-02', item=item)
+        self.client.force_login(self.supervisor)
+        response = self.post(f'delete_calendar:{self.asg.id}')
+        self.assertContains(response, 'saved calendar entries')
+        self.assertTrue(ASG.objects.filter(pk=self.asg.pk).exists())
+
+    def test_superuser_can_manage_any_division(self):
+        other = ASG.objects.create(name='Penguin', string=self.string_b)
+        self.client.force_login(self.superuser)
+        page = self.client.get(self.url)
+        self.assertContains(page, 'String A')
+        self.assertContains(page, 'String B')
+        self.post(f'delete_calendar:{other.id}')
+        self.assertFalse(ASG.objects.filter(pk=other.pk).exists())

@@ -7,6 +7,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.contrib.auth.models import User
+from django.utils.crypto import get_random_string
 from django.db.models import Count, Prefetch, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -535,6 +536,22 @@ def _remove_keeper(request, strings, string_id, user_id):
     messages.success(request, 'Keeper removed.')
 
 
+def _reset_password(request, strings, string_id, user_id):
+    """Give one of this string's keepers a new temporary password (shown once to the supervisor)."""
+    string = get_object_or_404(strings, pk=string_id)
+    keeper = get_object_or_404(string.keepers, pk=user_id)
+    if keeper.is_staff or keeper.is_superuser or is_supervisor(keeper):
+        raise PermissionDenied('Only keeper passwords can be reset here.')
+    temporary = get_random_string(8, allowed_chars='abcdefghjkmnpqrstuvwxyz23456789')  # no look-alike characters
+    keeper.set_password(temporary)
+    keeper.save()
+    messages.warning(
+        request,
+        f'Temporary password for {keeper.username.capitalize()}: {temporary} \u2014 tell them, and they can '
+        f'change it with "Change password" in the menu.',
+    )
+
+
 def _add_animal(request, strings, string_id):
     string = get_object_or_404(strings, pk=string_id)
     name = _clean(request.POST.get(f'new_animal_{string.id}'))
@@ -607,6 +624,7 @@ def _remove_reinforcer(request, strings, animal_id, reinforcer_id):
 MANAGE_ACTIONS = {
     'add_string': _add_string, 'rename_string': _rename_string, 'set_division': _set_division,
     'delete_string': _delete_string, 'add_keeper': _add_keeper, 'remove_keeper': _remove_keeper,
+    'reset_password': _reset_password,
     'add_animal': _add_animal, 'delete_animal': _delete_animal,
     'add_behavior': _add_behavior, 'remove_behavior': _remove_behavior, 'move_behavior': _move_behavior,
     'add_reinforcer': _add_reinforcer, 'remove_reinforcer': _remove_reinforcer,
@@ -655,3 +673,100 @@ def set_divisions(request):
     if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
         next_url = reverse('zoo:asg_list')
     return redirect(next_url)
+
+
+# ---- Manage calendars (supervisors and superusers) ----
+
+def _add_calendar(request, strings, string_id):
+    string = get_object_or_404(strings, pk=string_id)
+    name = _clean(request.POST.get(f'new_calendar_{string.id}'))
+    if not name:
+        messages.warning(request, 'Enter a name for the calendar.')
+    elif ASG.objects.filter(name__iexact=name).exists():
+        messages.warning(request, f'A calendar named "{name}" already exists.')
+    else:
+        ASG.objects.create(name=name, string=string)
+        messages.success(request, f'Added calendar {name} to {string.name}.')
+
+
+def _rename_calendar(request, strings, asg_id):
+    asg = get_object_or_404(ASG, pk=asg_id, string__in=strings)
+    name = _clean(request.POST.get(f'rename_calendar_{asg.id}'))
+    if not name:
+        messages.warning(request, 'A calendar needs a name.')
+    elif ASG.objects.filter(name__iexact=name).exclude(pk=asg.pk).exists():
+        messages.warning(request, f'A calendar named "{name}" already exists.')
+    else:
+        asg.name = name
+        asg.save()
+        messages.success(request, 'Calendar renamed.')
+
+
+def _add_calendar_from(request, strings, string_id):
+    """Add a new calendar to this string, copying special concerns, notes and approved items from an existing one."""
+    string = get_object_or_404(strings, pk=string_id)
+    name = _clean(request.POST.get(f'new_calendar_from_{string.id}'))
+    source = ASG.objects.filter(pk=request.POST.get(f'copy_from_{string.id}') or None, string=string).first()
+    if not name:
+        messages.warning(request, 'Enter a name for the new calendar.')
+        return
+    if source is None:
+        messages.warning(request, 'Choose a calendar to copy from.')
+        return
+    if ASG.objects.filter(name__iexact=name).exists():
+        messages.warning(request, f'A calendar named "{name}" already exists.')
+        return
+    new_asg = ASG.objects.create(name=name, string=string, notes=source.notes)
+    new_asg.special_concerns.set(source.special_concerns.all())
+    new_asg.behavior_goals.set(source.behavior_goals.all())
+    for assignment in source.item_assignments.all():
+        ASGApprovedItem.objects.create(
+            asg=new_asg, item=assignment.item, is_food=assignment.is_food,
+            comments=assignment.comments, rate=assignment.rate,
+        )
+    messages.success(request, f'Added calendar {name} to {string.name}, copied from {source.name}.')
+
+
+def _move_calendar(request, strings, asg_id):
+    asg = get_object_or_404(ASG, pk=asg_id, string__in=strings)
+    destination = get_object_or_404(strings, pk=request.POST.get(f'move_to_{asg.id}') or None)
+    if destination.pk == asg.string_id:
+        messages.warning(request, f'{asg.name} is already on {destination.name}.')
+        return
+    old_string = asg.string
+    asg.string = destination
+    asg.save()
+    messages.success(request, f'Moved {asg.name} from {old_string.name} to {destination.name}.')
+
+
+def _delete_calendar(request, strings, asg_id):
+    asg = get_object_or_404(ASG, pk=asg_id, string__in=strings)
+    entries = asg.calendar_entries.count()
+    if entries:
+        messages.warning(request, f'{asg.name} still has {entries} saved calendar entries, so it cannot be deleted.')
+    else:
+        name = asg.name
+        asg.delete()
+        messages.success(request, f'Deleted calendar {name}.')
+
+
+CALENDAR_MANAGE_ACTIONS = {
+    'add_calendar': _add_calendar, 'add_calendar_from': _add_calendar_from,
+    'rename_calendar': _rename_calendar, 'move_calendar': _move_calendar, 'delete_calendar': _delete_calendar,
+}
+
+
+@supervisor_required
+def manage_calendars(request):
+    strings = _manageable_strings(request)
+    if request.method == 'POST':
+        verb, *ids = request.POST.get('do', '').split(':')
+        handler = CALENDAR_MANAGE_ACTIONS.get(verb)
+        if handler is None:
+            messages.warning(request, 'Unknown action.')
+        else:
+            handler(request, strings, *ids)
+        return redirect('zoo:manage_calendars')
+
+    strings = strings.prefetch_related('asgs')
+    return render(request, 'zoo/manage_calendars.html', {'strings': strings})

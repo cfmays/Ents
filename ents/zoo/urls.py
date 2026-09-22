@@ -19,6 +19,7 @@ urlpatterns = [
     path('training/ajax_animals_for_string/', views.training_ajax_animals_for_string, name='training_ajax_animals_for_string'),
     path('divisions/', views.set_divisions, name='set_divisions'),
     path('training/manage/', views.manage_training, name='manage_training'),
+    path('calendars/manage/', views.manage_calendars, name='manage_calendars'),
     path('training/animal/<int:animal_id>/', views.training_entry, name='training_entry'),
     path('training/animal/<int:animal_id>/history/', views.training_history, name='training_history'),
 

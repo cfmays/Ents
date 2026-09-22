@@ -2,7 +2,10 @@
 
 {% block content %}
 <h1>Enrichment Calendars</h1>
-<p><a href="{% url 'zoo:training_start' %}">Go to Training Log</a></p>
+<p>
+  <a href="{% url 'zoo:training_start' %}">Go to Training Log</a>
+  {% if can_manage_lists %}| <a href="{% url 'zoo:manage_calendars' %}">Manage Calendars</a>{% endif %}
+</p>
 
 {% for string in strings %}
 <h4>{{ string.name }}</h4>
