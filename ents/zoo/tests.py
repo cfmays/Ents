@@ -698,6 +698,34 @@ class ManageTrainingTests(TestCase):
         self.assertContains(self.client.get(start), 'Manage training logs')
         self.assertEqual(self.client.get(self.url).status_code, 200)
 
+    def test_master_list_print_link_and_page_for_supervisors_only(self):
+        self.client.force_login(self.keeper)
+        self.assertEqual(self.client.get(reverse('zoo:training_master_list_print')).status_code, 403)
+
+        self.client.force_login(self.supervisor)
+        self.assertContains(self.client.get(self.url), 'Print master list')
+
+    def test_master_list_print_shows_strings_keepers_calendars_and_behaviors(self):
+        keeper = User.objects.create_user('kaylee', password='pw')
+        self.string_a.keepers.add(keeper)
+        asg = ASG.objects.create(name='Tiger', string=self.string_a)
+        maintenance = Behavior.objects.create(name='Target', behavior_type='maintenance')
+        new = Behavior.objects.create(name='Crate', behavior_type='new')
+        self.animal.maintenance_behaviors.add(maintenance)
+        self.animal.new_behaviors.add(new)
+        reinforcer = Reinforcer.objects.create(name='Grapes')
+        self.animal.reinforcers.add(reinforcer)
+
+        self.client.force_login(self.supervisor)
+        page = self.client.get(reverse('zoo:training_master_list_print'))
+        self.assertContains(page, 'String A')
+        self.assertNotContains(page, 'String B')  # other division not shown
+        self.assertContains(page, 'Kaylee')
+        self.assertContains(page, 'Tiger')
+        self.assertContains(page, 'Target')
+        self.assertContains(page, 'Crate')
+        self.assertContains(page, 'Grapes')
+
     def test_supervisor_only_sees_and_changes_own_division(self):
         self.client.force_login(self.supervisor)
         page = self.client.get(self.url)

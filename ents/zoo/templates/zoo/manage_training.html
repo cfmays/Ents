@@ -15,7 +15,10 @@
 </style>
 
 <h1>Manage training logs</h1>
-<p><a href="{% url 'zoo:training_start' %}">Back to Training Log</a></p>
+<p>
+  <a href="{% url 'zoo:training_start' %}">Back to Training Log</a> |
+  <a href="{% url 'zoo:training_master_list_print' %}" target="_blank">Print master list</a>
+</p>
 
 <form method="post" id="manage-form">
   {% csrf_token %}

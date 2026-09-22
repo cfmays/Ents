@@ -672,6 +672,18 @@ def manage_training(request):
     })
 
 
+@supervisor_required
+def training_master_list_print(request):
+    """Printable overview: each string with its keepers, calendars, and training animals' behaviors."""
+    strings = _manageable_strings(request).prefetch_related(
+        'keepers', 'asgs',
+        Prefetch('training_animals', queryset=TrainingAnimal.objects.prefetch_related(
+            'maintenance_behaviors', 'new_behaviors', 'reinforcers',
+        )),
+    )
+    return render(request, 'zoo/training_master_list_print.html', {'strings': strings})
+
+
 @login_required
 @require_POST
 def set_divisions(request):
