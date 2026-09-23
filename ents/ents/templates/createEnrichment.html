@@ -15,6 +15,16 @@
   /* "No file chosen" in light gray; the button keeps its normal look and a chosen file name is normal text */
   input[type=file].no-file { color: #aaa; }
   input[type=file].no-file::file-selector-button { color: #212529; }
+
+  /* Unassigned photos: one row per file, click the thumbnail to see it full size */
+  .unassigned-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid #d8ccae; }
+  .unassigned-row img.row-photo { cursor: zoom-in; }
+  .unassigned-row .filename { width: 220px; flex-shrink: 0; word-break: break-all; }
+  .unassigned-row input[name=unassigned_name] { flex: 1; }
+  #photo-overlay { display: none; position: fixed; inset: 0; z-index: 3000; background: rgba(0,0,0,.8); cursor: zoom-out;
+                   flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+  #photo-overlay img { max-width: 92vw; max-height: 80vh; background: #fff; border-radius: 6px; }
+  #photo-overlay div { color: #fff; margin-top: 12px; max-width: 80vw; text-align: center; font-size: 16px; overflow-wrap: anywhere; }
 </style>
 
 <h1>Manage Items</h1>
@@ -84,21 +94,21 @@
   Type a name and click Add item &mdash; the file doesn't need to be uploaded again.
   Remove this section once every one of these has been handled.
 </p>
+<div id="photo-overlay" title="Click or press Esc to close"><img alt=""><div></div></div>
 {% if unassigned_photos %}
-<div class="row">
-  {% for photo in unassigned_photos %}
-  <div class="col-auto text-center mb-3" style="width:130px">
-    <img src="{% url 'unassignedPhotoPreview' photo.filename %}" style="height:90px;width:90px;object-fit:cover;border-radius:4px;" alt="">
-    <div class="text-muted small" style="word-break:break-all">{{ photo.filename }}</div>
-    <form method="post">
-      {% csrf_token %}
-      <input type="hidden" name="unassigned_file" value="{{ photo.filename }}">
-      <input type="text" name="unassigned_name" value="{{ photo.suggested_name }}" maxlength="255" class="form-control form-control-sm mt-1">
-      <button type="submit" name="action" value="add_from_unassigned" class="btn btn-sm btn-secondary mt-1">Add item</button>
-    </form>
-  </div>
-  {% endfor %}
+{% for photo in unassigned_photos %}
+<div class="unassigned-row">
+  <img class="row-photo" src="{% url 'unassignedPhotoPreview' photo.filename %}" data-caption="{{ photo.filename }}"
+       title="Click to see the photo full size" style="height:60px;width:60px;flex-shrink:0;object-fit:cover;border-radius:4px;" alt="">
+  <div class="filename text-muted small">{{ photo.filename }}</div>
+  <form method="post" style="display:flex; gap:8px; align-items:center; flex:1">
+    {% csrf_token %}
+    <input type="hidden" name="unassigned_file" value="{{ photo.filename }}">
+    <input type="text" name="unassigned_name" value="{{ photo.suggested_name }}" maxlength="255" class="form-control">
+    <button type="submit" name="action" value="add_from_unassigned" class="btn btn-sm btn-secondary" style="flex-shrink:0">Add item</button>
+  </form>
 </div>
+{% endfor %}
 {% else %}
 <p><em>None left.</em></p>
 {% endif %}
@@ -277,5 +287,15 @@
     var id = $(this).val();
     window.location.href = "{% url 'createView' %}" + (id ? "?item=" + id : "");
   });
+
+  // click an unassigned photo's thumbnail to see it full size (temporary section)
+  function closePhoto() { $("#photo-overlay").hide(); }
+  $(document).on("click", "img.row-photo", function () {
+    $("#photo-overlay img").attr("src", this.src);
+    $("#photo-overlay div").text($(this).data("caption"));
+    $("#photo-overlay").css("display", "flex");
+  });
+  $("#photo-overlay").click(closePhoto);
+  $(document).on("keydown", function (event) { if (event.key === "Escape") { closePhoto(); } });
 </script>
 {% endblock %}
