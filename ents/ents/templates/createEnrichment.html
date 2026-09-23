@@ -88,6 +88,31 @@
 {% endif %}
 
 <hr>
+<h4>Add a new item</h4>
+<form method="post" enctype="multipart/form-data">{% csrf_token %}
+  {{ form.as_p }}
+  <input type="submit" value="Add new item">
+</form>
+
+<hr>
+<h4>Look up an item's calendar lists</h4>
+<select id="lookup-item" class="form-control" style="max-width:400px;">
+  <option value="">Choose an item&hellip;</option>
+  {% for i in items %}<option value="{{ i.id }}">{{ i.name }}</option>{% endfor %}
+</select>
+<p id="remove-all-wrap" class="mt-2 mb-1" style="display:none"><a href="#" id="remove-all" class="text-danger">Remove from all calendar lists</a></p>
+<ul id="lookup-result" class="mt-1"></ul>
+
+<hr>
+<h4>Add item(s) to calendar list(s)</h4>
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="add_to_lists">
+  {{ assign_form.as_p }}
+  <button type="submit" class="btn btn-primary">Add item(s)</button>
+</form>
+
+<hr>
 <h4>Unassigned photos <span class="text-muted" style="font-size:0.9rem; font-weight:normal">(Temporary)</span></h4>
 <p class="text-muted small">
   Photo files already on the server that aren't attached to any item yet ({{ unassigned_photos|length }} left).
@@ -112,31 +137,6 @@
 {% else %}
 <p><em>None left.</em></p>
 {% endif %}
-
-<hr>
-<h4>Add a new item</h4>
-<form method="post" enctype="multipart/form-data">{% csrf_token %}
-  {{ form.as_p }}
-  <input type="submit" value="Add new item">
-</form>
-
-<hr>
-<h4>Look up an item's calendar lists</h4>
-<select id="lookup-item" class="form-control" style="max-width:400px;">
-  <option value="">Choose an item&hellip;</option>
-  {% for i in items %}<option value="{{ i.id }}">{{ i.name }}</option>{% endfor %}
-</select>
-<p id="remove-all-wrap" class="mt-2 mb-1" style="display:none"><a href="#" id="remove-all" class="text-danger">Remove from all calendar lists</a></p>
-<ul id="lookup-result" class="mt-1"></ul>
-
-<hr>
-<h4>Add item(s) to calendar list(s)</h4>
-<form method="post">
-  {% csrf_token %}
-  <input type="hidden" name="action" value="add_to_lists">
-  {{ assign_form.as_p }}
-  <button type="submit" class="btn btn-primary">Add item(s)</button>
-</form>
 
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
