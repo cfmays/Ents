@@ -58,13 +58,15 @@ in step 5.
 
 ## 2. Back up what's currently live
 
-On the server, in the app directory:
+On the server. The database lives in the app directory; media lives wherever
+`ENTS_MEDIA_ROOT` from step 1 points — on this droplet, `/home/charley/ents-media/`,
+outside the project directory:
 
 ```
 cd /home/charley/Ents/ents
 mkdir -p ~/ents-backups
 cp db.sqlite3 ~/ents-backups/db.sqlite3.$(date +%Y%m%d-%H%M%S)
-tar czf ~/ents-backups/media.$(date +%Y%m%d-%H%M%S).tar.gz media/
+tar czf ~/ents-backups/media.$(date +%Y%m%d-%H%M%S).tar.gz -C /home/charley/ents-media enrichments/
 ```
 
 Confirm both files landed in `~/ents-backups/` and aren't empty before
@@ -93,16 +95,25 @@ where it doubles as a verification step.
 
 ## 4. Stop the app
 
+`entsgunicorn.service` is socket-activated by `entsgunicorn.socket` — stopping
+only the service isn't enough, since the socket will just respawn it on the
+next connection. Stop both:
+
 ```
+sudo systemctl stop entsgunicorn.socket
 sudo systemctl stop entsgunicorn.service
+sudo systemctl status entsgunicorn.socket entsgunicorn.service --no-pager
 ```
+
+Confirm both show `inactive (dead)` before continuing.
 
 ## 5. ⚠️ DESTRUCTIVE: swap in the dev database and photos
 
 From your Mac, copy the dev database and the dev media folder to the server.
 Adjust the destination path to wherever you confirmed `ENTS_MEDIA_ROOT`
-points in step 1 — the example below assumes it's `media/enrichments` inside
-the project directory, same as dev.
+points in step 1 — on this droplet it's `/home/charley/ents-media/`,
+**outside** the project directory (not `ents/media/` like dev). Always
+re-check step 1's output rather than assuming this hasn't changed.
 
 **Important distinction:** there are two different `enrichments` folders on
 your Mac. You want `ents/media/enrichments/` (the app's actual photo
@@ -114,7 +125,7 @@ From `/Users/charlesmays/Dev/Ents/ents`:
 
 ```
 scp db.sqlite3 charley@<droplet-ip>:/home/charley/Ents/ents/db.sqlite3
-rsync -av media/enrichments/ charley@<droplet-ip>:/home/charley/Ents/ents/media/enrichments/
+rsync -av media/enrichments/ charley@<droplet-ip>:/home/charley/ents-media/enrichments/
 ```
 
 (`rsync` rather than `scp -r` so it's resumable if the connection drops
@@ -170,9 +181,14 @@ any time after this deploy — it doesn't need to happen now.
 
 ## 7. Restart and verify
 
+Same socket-activation wrinkle as step 4: starting just the service is
+enough for the socket to hand it connections, but starting both up front
+avoids a cold-start delay on the very first request.
+
 ```
-sudo systemctl restart entsgunicorn.service
-sudo systemctl status entsgunicorn.service
+sudo systemctl start entsgunicorn.socket
+sudo systemctl start entsgunicorn.service
+sudo systemctl status entsgunicorn.socket entsgunicorn.service --no-pager
 ```
 
 Then in a browser:
@@ -181,8 +197,8 @@ Then in a browser:
   item thumbnails — if thumbnails are broken but everything else works,
   that's almost always the nginx media alias
   (`/etc/nginx/sites-available/ents.charleymays.org`) still pointing at the
-  old media path rather than wherever you put `media/enrichments/` in
-  step 5.
+  old media path rather than wherever `ENTS_MEDIA_ROOT` (step 1) actually
+  points.
 - Log in as `charley`.
 - Open Enrichment Calendars, open a calendar (e.g. Tiger), confirm it loads
   with its items and animal choices.
@@ -193,11 +209,13 @@ Then in a browser:
 ## If something's badly wrong: rollback
 
 ```
+sudo systemctl stop entsgunicorn.socket
 sudo systemctl stop entsgunicorn.service
 cd /home/charley/Ents/ents
 cp ~/ents-backups/db.sqlite3.<timestamp> db.sqlite3
-rm -rf media/enrichments
-tar xzf ~/ents-backups/media.<timestamp>.tar.gz
+rm -rf /home/charley/ents-media/enrichments
+tar xzf ~/ents-backups/media.<timestamp>.tar.gz -C /home/charley/ents-media
+sudo systemctl start entsgunicorn.socket
 sudo systemctl start entsgunicorn.service
 ```
 
