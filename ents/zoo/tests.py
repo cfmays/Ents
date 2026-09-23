@@ -70,7 +70,7 @@ class TrainingFlowTests(TestCase):
         self.assertContains(response, 'Target')
         self.assertContains(response, 'Crate')
 
-    def test_training_history_lists_sessions_for_accessible_animals_only(self):
+    def test_training_history_lists_sessions_and_is_open_to_any_keeper(self):
         self.client.post(reverse('zoo:training_entry', args=[self.animal.id]), {'date': '2026-09-15'})  # not logged in: ignored
         self.client.force_login(self.keeper)
         self.client.post(reverse('zoo:training_entry', args=[self.animal.id]), {
@@ -83,9 +83,10 @@ class TrainingFlowTests(TestCase):
         self.assertContains(page, 'Grapes')
         self.assertContains(self.client.get(reverse('zoo:training_entry', args=[self.animal.id])), 'History')
 
+        # a keeper with no string assignments still gets to see it: keepers can access any training log
         other = User.objects.create_user('other', password='pw')
         self.client.force_login(other)
-        self.assertEqual(self.client.get(reverse('zoo:training_history', args=[self.animal.id])).status_code, 403)
+        self.assertEqual(self.client.get(reverse('zoo:training_history', args=[self.animal.id])).status_code, 200)
 
     def test_training_form_warns_before_leaving_with_unsaved_changes(self):
         self.client.force_login(self.keeper)
@@ -137,26 +138,27 @@ class KeeperAccessScopingTests(TestCase):
 
         self.superuser = User.objects.create_superuser('root2', 'root2@example.com', 'pw')
 
-    def test_unassigned_keeper_cannot_open_calendar(self):
+    def test_unassigned_keeper_can_open_calendar(self):
+        # regular keepers get every calendar, not just the strings they're assigned to
         self.client.force_login(self.unassigned_keeper)
         response = self.client.get(reverse('zoo:calendar_tab', args=[self.asg.id]))
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 200)
 
-    def test_unassigned_keeper_cannot_open_list_management_or_reporting_or_training(self):
+    def test_unassigned_keeper_can_open_reporting_and_training_but_not_list_management(self):
         self.client.force_login(self.unassigned_keeper)
         self.assertEqual(self.client.get(reverse('zoo:list_management_tab', args=[self.asg.id])).status_code, 403)
-        self.assertEqual(self.client.get(reverse('zoo:reporting_view', args=[self.asg.id])).status_code, 403)
-        self.assertEqual(self.client.get(reverse('zoo:training_entry', args=[self.animal.id])).status_code, 403)
+        self.assertEqual(self.client.get(reverse('zoo:reporting_view', args=[self.asg.id])).status_code, 200)
+        self.assertEqual(self.client.get(reverse('zoo:training_entry', args=[self.animal.id])).status_code, 200)
 
     def test_assigned_keeper_can_open_calendar(self):
         self.client.force_login(self.assigned_keeper)
         response = self.client.get(reverse('zoo:calendar_tab', args=[self.asg.id]))
         self.assertEqual(response.status_code, 200)
 
-    def test_asg_list_only_shows_accessible_strings(self):
+    def test_asg_list_shows_every_string_to_any_keeper(self):
         self.client.force_login(self.unassigned_keeper)
         response = self.client.get(reverse('zoo:asg_list'))
-        self.assertNotContains(response, 'Penguin')
+        self.assertContains(response, 'Penguin')
 
         self.client.force_login(self.assigned_keeper)
         response = self.client.get(reverse('zoo:asg_list'))
@@ -327,7 +329,7 @@ class KeeperAccessScopingTests(TestCase):
             self.assertNotContains(response, hidden)
 
         self.client.force_login(self.unassigned_keeper)
-        self.assertEqual(self.client.get(url).status_code, 403)
+        self.assertEqual(self.client.get(url).status_code, 200)
 
     def test_save_and_print_goes_to_the_print_page_only_when_saved(self):
         item = Enrichment.objects.create(name='Ball', photo=make_image_file(name='ball.png'))
@@ -525,12 +527,12 @@ class KeeperAccessScopingTests(TestCase):
         self.client.post(url, {'remove_animal': choice.id})
         self.assertFalse(self.asg.animals.exists())
 
-    def test_training_animals_list_follows_string_access(self):
-        self.client.force_login(self.assigned_keeper)
+    def test_training_animals_list_is_open_to_any_keeper(self):
         url = reverse('zoo:training_ajax_animals_for_string')
+        self.client.force_login(self.assigned_keeper)
         self.assertContains(self.client.get(url, {'string_id': self.string.id}), 'Penguin-African, Carl')
         self.client.force_login(self.unassigned_keeper)
-        self.assertNotContains(self.client.get(url, {'string_id': self.string.id}), 'Penguin-African, Carl')
+        self.assertContains(self.client.get(url, {'string_id': self.string.id}), 'Penguin-African, Carl')
 
 
 @override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
@@ -870,9 +872,21 @@ class WorkingDivisionTests(TestCase):
         }, follow=True)
 
     def test_checkboxes_only_for_people_with_more_than_one_division(self):
-        for user, expected in ((self.both, True), (self.root, True), (self.one, False), (self.keeper, False)):
+        # regular keepers can work in every division, so they get the checkboxes too whenever there's more than one
+        for user, expected in ((self.both, True), (self.root, True), (self.one, False), (self.keeper, True)):
             self.client.force_login(user)
             self.assertEqual('Working in:' in self.client.get(reverse('zoo:asg_list')).content.decode(), expected, user.username)
+
+    def test_keeper_sees_and_can_filter_every_division(self):
+        self.client.force_login(self.keeper)
+        page = self.client.get(reverse('zoo:asg_list'))
+        self.assertContains(page, 'Tiger String')
+        self.assertContains(page, 'Penguin String')  # everything ticked by default
+
+        self.pick(self.terrestrial)
+        page = self.client.get(reverse('zoo:asg_list'))
+        self.assertContains(page, 'Tiger String')
+        self.assertNotContains(page, 'Penguin String')
 
     def test_ticking_divisions_filters_calendars_and_manage_page(self):
         self.client.force_login(self.both)

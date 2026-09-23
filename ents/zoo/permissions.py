@@ -23,19 +23,19 @@ def supervisor_required(view_func):
 def user_can_access_string(user, string):
     """True if `user` may view/edit a String's calendars/training animals.
 
-    Keepers only get Strings they're actually assigned to; supervisors get
-    anything in a Division they're assigned to (matching the admin scoping);
-    superusers get everything.
+    Regular keepers get every String's calendars and training logs;
+    supervisors get anything in a Division they're assigned to, or any
+    String they personally keep (matching the admin scoping); superusers
+    get everything.
     """
     if user.is_superuser:
         return True
+    if not is_supervisor(user):
+        return True
     if string.keepers.filter(pk=user.pk).exists():
         return True
-    if is_supervisor(user):
-        profile = getattr(user, 'profile', None)
-        if profile and string.division_id and profile.divisions.filter(pk=string.division_id).exists():
-            return True
-    return False
+    profile = getattr(user, 'profile', None)
+    return bool(profile and string.division_id and profile.divisions.filter(pk=string.division_id).exists())
 
 
 def user_can_access_asg(user, asg):
@@ -47,11 +47,11 @@ def user_can_access_training_animal(user, animal):
 
 
 def available_divisions(user):
-    """Divisions a user can work in: all for superusers, their profile's for supervisors, none for keepers."""
-    if user.is_superuser:
+    """Divisions a user can work in: all for superusers and regular keepers, their profile's for supervisors."""
+    if user.is_superuser or not is_supervisor(user):
         return Division.objects.all()
     profile = getattr(user, 'profile', None)
-    return profile.divisions.all() if profile and is_supervisor(user) else Division.objects.none()
+    return profile.divisions.all() if profile else Division.objects.none()
 
 
 def picked_divisions(request):

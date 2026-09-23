@@ -8,6 +8,7 @@ from ents.forms import EnrichmentSelect
 from ents.models import Enrichment
 
 from .models import ASG, Animal, CalendarEntry, Reinforcer, SCALE_1_5, String
+from .permissions import is_supervisor
 
 
 def item_labels_for(asg):
@@ -94,7 +95,9 @@ class TrainingStringForm(forms.Form):
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
-        if user is not None:
+        # supervisors (and superusers) only train the strings they're assigned; regular
+        # keepers can train any string, so they keep the default "every string" queryset
+        if user is not None and is_supervisor(user):
             self.fields['string'].queryset = user.strings.all()
 
 

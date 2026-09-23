@@ -44,7 +44,7 @@ def _get_accessible_training_animal(request, animal_id):
 @login_required
 def asg_list(request):
     scope = division_scope(request)
-    if request.user.is_superuser:
+    if request.user.is_superuser or not is_supervisor(request.user):
         strings = String.objects.all() if scope is None else String.objects.filter(division__in=scope)
     else:
         strings = String.objects.filter(Q(keepers=request.user) | Q(division__in=scope)).distinct()
