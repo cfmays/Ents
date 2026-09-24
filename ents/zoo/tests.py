@@ -535,6 +535,32 @@ class KeeperAccessScopingTests(TestCase):
         self.assertEqual(self.client.post(url, {'remove_item': rows.get().id}).status_code, 403)
         self.assertEqual(rows.count(), 1)
 
+    def test_supervisor_can_edit_an_approved_items_comments(self):
+        supervisor_group, _ = Group.objects.get_or_create(name='Supervisor')
+        supervisor = User.objects.create_user('boss5', password='pw', is_staff=True)
+        supervisor.groups.add(supervisor_group)
+        supervisor.profile.divisions.add(self.division)
+        item = Enrichment.objects.create(name='Coloring', photo=make_image_file(name='c.png'))
+        assignment = ASGApprovedItem.objects.create(asg=self.asg, item=item)
+        url = reverse('zoo:list_management_tab', args=[self.asg.id])
+
+        self.client.force_login(supervisor)
+        response = self.client.post(url, {'edit_comments': assignment.id, 'comments': '  Stays up at tiger  '}, follow=True)
+        assignment.refresh_from_db()
+        self.assertEqual(assignment.comments, 'Stays up at tiger')
+        self.assertContains(response, 'Updated comments for Coloring.')
+        self.assertContains(response, 'Stays up at tiger')
+
+        # blanking it out clears the comment
+        self.client.post(url, {'edit_comments': assignment.id, 'comments': ''})
+        assignment.refresh_from_db()
+        self.assertEqual(assignment.comments, '')
+
+        self.client.force_login(self.assigned_keeper)
+        self.assertEqual(self.client.post(url, {'edit_comments': assignment.id, 'comments': 'Sneaky'}).status_code, 403)
+        assignment.refresh_from_db()
+        self.assertEqual(assignment.comments, '')
+
     def test_list_management_is_for_supervisors_only(self):
         url = reverse('zoo:list_management_tab', args=[self.asg.id])
         for page in (reverse('zoo:calendar_tab', args=[self.asg.id]), reverse('zoo:asg_list')):

@@ -131,8 +131,12 @@
       {% endif %}
       <div class="item-text">
         {{ assignment.item.name }}
-        {% if assignment.comments %}<div class="text-muted small">{{ assignment.comments }}</div>{% endif %}
         {% if assignment.rate %}<div class="text-muted small">Rate: {{ assignment.rate }}</div>{% endif %}
+        <form method="post" style="display:flex;gap:6px;align-items:center;margin-top:4px">
+          {% csrf_token %}
+          <input type="text" name="comments" value="{{ assignment.comments }}" maxlength="500" class="form-control form-control-sm" placeholder="Comments" style="max-width:320px">
+          <button type="submit" name="edit_comments" value="{{ assignment.id }}" class="btn btn-sm btn-outline-secondary">Save</button>
+        </form>
       </div>
       
       <form method="post" onsubmit="return confirm('Remove this item from {{ asg.name|escapejs }}?');">

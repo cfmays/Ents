@@ -276,6 +276,13 @@ def _change_items(request, asg):
         ASGApprovedItem.objects.filter(asg=asg, pk=post['remove_item']).delete()
         messages.success(request, 'Item removed from this calendar.')
         return
+    if 'edit_comments' in post:
+        assignment = ASGApprovedItem.objects.filter(asg=asg, pk=post['edit_comments']).select_related('item').first()
+        if assignment:
+            assignment.comments = post.get('comments', '').strip()[:500]
+            assignment.save()
+            messages.success(request, f'Updated comments for {assignment.item.name}.')
+        return
     item = Enrichment.objects.filter(pk=post.get('item')).first()
     if item is None:
         messages.warning(request, 'Choose an item to add.')
@@ -337,7 +344,7 @@ def list_management_tab(request, asg_id):
         elif any(key in request.POST for key in ('add_concern', 'add_goal_text', 'remove_concern', 'remove_goal')):
             _change_concerns_or_goals(request, asg)
             return redirect('zoo:list_management_tab', asg_id=asg.id)
-        elif 'add_item' in request.POST or 'remove_item' in request.POST:
+        elif 'add_item' in request.POST or 'remove_item' in request.POST or 'edit_comments' in request.POST:
             _change_items(request, asg)
             return redirect('zoo:list_management_tab', asg_id=asg.id)
 
