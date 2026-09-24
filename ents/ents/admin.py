@@ -19,6 +19,7 @@ class EnrichmentAdmin(admin.ModelAdmin):
     list_display = ['name', 'category', 'is_food']
     list_filter = ['category', 'is_food']
     search_fields = ['name']
+    filter_horizontal = ['components']
     actions = ['assign_to_asgs']
 
     @admin.action(description='Assign selected items to calendar(s)')

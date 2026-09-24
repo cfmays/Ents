@@ -6,10 +6,12 @@ from PIL import Image
 class Enrichment(models.Model):
     name = models.CharField( max_length=255, unique=True)
     # validate given an image with thanks to https://stackoverflow.com/a/63705082/3023411
-    photo = models.ImageField(upload_to='enrichments/', default="", validators=[validate_image_file_extension])
+    photo = models.ImageField(upload_to='enrichments/', default="", blank=True, validators=[validate_image_file_extension])
     # string FK so ents doesn't have to import the zoo app (which itself imports Enrichment)
     category = models.ForeignKey('zoo.ItemCategory', on_delete=models.SET_NULL, null=True, blank=True)
     is_food = models.BooleanField(default=False)
+    # items that interact and are used together as one enrichment (blank for a normal single item)
+    components = models.ManyToManyField('self', blank=True, symmetrical=False, related_name='used_in')
 
     class Meta:
         ordering = ['name']

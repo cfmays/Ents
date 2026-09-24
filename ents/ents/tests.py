@@ -152,6 +152,21 @@ class EnrichmentUploadViewTests(TestCase):
         new_item = Enrichment.objects.get(name='Kong Toy')
         self.assertRedirects(response, f"{reverse('createView')}?item={new_item.id}")  # stays on Manage Items, item selected
 
+    def test_post_without_a_photo_creates_enrichment(self):
+        self.client.login(username='alice', password='password123')
+        response = self.client.post(self.url, {'name': 'Cardboard Box'})
+        new_item = Enrichment.objects.get(name='Cardboard Box')
+        self.assertFalse(new_item.photo)
+        self.assertRedirects(response, f"{reverse('createView')}?item={new_item.id}")
+
+    def test_post_with_components_creates_a_combined_item(self):
+        self.client.login(username='alice', password='password123')
+        ball = Enrichment.objects.create(name='Ball', photo=make_image_file(name='b.png'))
+        firehose = Enrichment.objects.create(name='Firehose', photo=make_image_file(name='f.png'))
+        self.client.post(self.url, {'name': 'Ball in a Firehose', 'components': [ball.id, firehose.id]})
+        new_item = Enrichment.objects.get(name='Ball in a Firehose')
+        self.assertEqual(set(new_item.components.all()), {ball, firehose})
+
     def test_post_invalid_form_reshows_form_with_errors(self):
         self.client.login(username='alice', password='password123')
         response = self.client.post(self.url, {'name': '', 'photo': ''})
@@ -226,6 +241,24 @@ class ManageItemsTests(TestCase):
         self.client.post(self.url, {'action': 'delete', 'item': self.item.id})
         self.assertFalse(Enrichment.objects.filter(pk=self.item.pk).exists())
         self.assertFalse(ASGApprovedItem.objects.exists())
+
+    def test_set_components_makes_a_combined_item(self):
+        firehose = Enrichment.objects.create(name='Firehose', photo=make_image_file(name='f.png'))
+        ball = Enrichment.objects.create(name='Ball', photo=make_image_file(name='b.png'))
+        response = self.client.post(self.url, {
+            'action': 'components', 'item': self.item.id, 'components': [firehose.id, ball.id],
+        }, follow=True)
+        self.assertEqual(set(self.item.components.all()), {firehose, ball})
+        self.assertContains(response, 'combined item made of 2 item(s)')
+
+        # clearing components makes it a normal single item again
+        response = self.client.post(self.url, {'action': 'components', 'item': self.item.id}, follow=True)
+        self.assertFalse(self.item.components.exists())
+        self.assertContains(response, 'normal single item')
+
+    def test_components_cannot_include_the_item_itself(self):
+        self.client.post(self.url, {'action': 'components', 'item': self.item.id, 'components': [self.item.id]})
+        self.assertFalse(self.item.components.exists())
 
     def test_keepers_cannot_use_the_actions(self):
         User.objects.create_user(username='kay2', password='password123')

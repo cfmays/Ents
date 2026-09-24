@@ -71,6 +71,19 @@
         <button type="submit" name="action" value="photo" class="btn btn-sm btn-secondary">Upload new photo</button>
       </form>
 
+      <form method="post" style="display:flex; gap:8px; align-items:flex-start; margin-top:8px">
+        {% csrf_token %}
+        <input type="hidden" name="item" value="{{ item.id }}">
+        <label for="components-select" class="mb-0" style="padding-top:6px">Made of:</label>
+        <select name="components" id="components-select" multiple style="width:100%; max-width:500px">
+          {% for i in items %}{% if i.id != item.id %}
+          <option value="{{ i.id }}"{% if i in item.components.all %} selected{% endif %}{% if i.photo %} data-thumb="{{ i.photo.url }}"{% endif %}>{{ i.name }}</option>
+          {% endif %}{% endfor %}
+        </select>
+        <button type="submit" name="action" value="components" class="btn btn-sm btn-secondary" style="flex-shrink:0">Save components</button>
+      </form>
+      <p class="text-muted small mb-0">Pick the other items this one is used together with, if any &mdash; leave empty for a normal single item. It's still added to calendars and scored on its own, like any other item.</p>
+
       <form method="post">
         {% csrf_token %}
         <input type="hidden" name="item" value="{{ item.id }}">
@@ -152,6 +165,12 @@
   }
   $("#pick-item").select2({ width: "100%", templateResult: thumbFormatter(56), templateSelection: thumbFormatter(50) });
 
+  // components of a combined item: searchable multi-select with thumbnails
+  $("#components-select, #id_components").select2({
+    width: "100%", placeholder: "No components (normal single item)",
+    templateResult: thumbFormatter(40), templateSelection: thumbFormatter(28),
+  });
+
   // searchable, wrapping multi-select for adding items to calendar lists
   $("#id_items").select2({ width: "50%", placeholder: "Search and pick one or more items" });
   $("label[for=id_items]").text("Items (" + $("#id_items option").length + " items):");
@@ -160,12 +179,26 @@
   var allItems = $("#pick-item option[value!='']").map(function () {
     return { id: this.value, text: this.text, thumb: $(this).data("thumb") || "" };
   }).get();
+  var currentItemId = "{{ item.id|default:'' }}";  // the item being edited can't be its own component
 
   function matching(terms, filtering, keep) {
     return allItems.filter(function (item) {
       return !filtering || keep.indexOf(item.id) !== -1 ||
         terms.every(function (t) { return item.text.toLowerCase().indexOf(t) !== -1; });
     });
+  }
+
+  // rebuild a "made of" multi-select (keeps thumbnails and whatever's already picked)
+  function rebuildComponentsSelect($select, terms, filtering, excludeId) {
+    var picked = $select.val() || [];
+    var candidates = matching(terms, filtering, picked).filter(function (item) { return item.id !== excludeId; });
+    $select.empty();
+    candidates.forEach(function (item) {
+      var $o = $("<option>").val(item.id).text(item.text).prop("selected", picked.indexOf(item.id) !== -1);
+      if (item.thumb) { $o.attr("data-thumb", item.thumb); }
+      $select.append($o);
+    });
+    $select.trigger("change.select2");
   }
 
   function applyFilter() {
@@ -202,6 +235,10 @@
     });
     $add.trigger("change.select2");
     $("label[for=id_items]").text("Items (" + forAdd.length + (forAdd.length === 1 ? " item" : " items") + "):");
+
+    // the two "made of" pickers
+    rebuildComponentsSelect($("#components-select"), terms, filtering, currentItemId);
+    rebuildComponentsSelect($("#id_components"), terms, filtering, "");
   }
 
   // the second and third boxes appear only once the one before them has text

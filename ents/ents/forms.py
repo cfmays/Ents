@@ -10,7 +10,8 @@ class CreateEnrichmentForm(forms.ModelForm):
 
     class Meta:
         model = Enrichment
-        fields = ('name', 'photo')
+        fields = ('name', 'photo', 'components')
+        labels = {'components': 'Made of (optional, for a combined item)'}
         enctype="multipart/form-data"
 
 class EnrichmentSelect(forms.Select):

@@ -99,7 +99,7 @@ def items_master_list_print(request):
 
 
 def _manage_item(request, item, action):
-    """Rename, replace the photo of, or delete the selected item; then go back to the Manage Items page."""
+    """Rename, replace the photo of, set the components of, or delete the selected item; then go back to Manage Items."""
     manage = reverse('createView')
     if item is None:
         messages.warning(request, 'Choose an item first.')
@@ -126,7 +126,14 @@ def _manage_item(request, item, action):
             messages.success(request, 'Photo replaced.')
         else:
             messages.warning(request, 'Choose an image file (jpg, png, gif or webp).')
-    else:  # delete
+    elif action == 'components':
+        chosen = Enrichment.objects.exclude(pk=item.pk).filter(pk__in=request.POST.getlist('components'))
+        item.components.set(chosen)
+        if chosen:
+            messages.success(request, f'{item.name} is now a combined item made of {chosen.count()} item(s).')
+        else:
+            messages.success(request, f'{item.name} is now a normal single item.')
+    elif action == 'delete':
         entries = item.calendar_entries.count()
         if entries:
             messages.warning(request, f'{item.name} is used in {entries} calendar entries, so it cannot be deleted.')
@@ -146,7 +153,7 @@ def EnrichmentUploadView(request):
     item = Enrichment.objects.filter(pk=request.GET.get('item') or request.POST.get('item') or None).first()
     action = request.POST.get('action')
     assign_form = ItemAssignmentForm(divisions=division_scope(request))
-    if request.method == 'POST' and action in ('rename', 'photo', 'delete'):
+    if request.method == 'POST' and action in ('rename', 'photo', 'components', 'delete'):
         return _manage_item(request, item, action)
     if request.method == 'POST' and action == 'add_from_unassigned':
         return _add_from_unassigned(request)
