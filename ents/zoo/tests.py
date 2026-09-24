@@ -113,6 +113,31 @@ class TrainingFlowTests(TestCase):
         self.keeper.profile.refresh_from_db()
         self.assertEqual(self.keeper.profile.last_training_string, self.string)
 
+    def test_submit_and_next_animal_goes_to_the_next_animal_in_the_string(self):
+        next_animal = TrainingAnimal.objects.create(name='Zar', string=self.string)  # sorts after "Mee-Noi"
+        self.client.force_login(self.keeper)
+        url = reverse('zoo:training_entry', args=[self.animal.id])
+        self.assertContains(self.client.get(url), 'Submit &amp; next animal (Zar)')
+
+        response = self.client.post(url, {
+            'date': '2026-09-15', 'reinforcer_1': self.reinforcer.id,
+            f'behavior_{self.maintenance_behavior.id}': '4', 'go_to_next': '1',
+        })
+        self.assertRedirects(response, reverse('zoo:training_entry', args=[next_animal.id]))
+        self.assertTrue(self.animal.training_sessions.exists())
+
+    def test_submit_and_next_animal_on_the_last_animal_goes_to_training_start(self):
+        self.client.force_login(self.keeper)
+        url = reverse('zoo:training_entry', args=[self.animal.id])
+        self.assertNotContains(self.client.get(url), 'next animal')
+
+        response = self.client.post(url, {
+            'date': '2026-09-15', 'reinforcer_1': self.reinforcer.id,
+            f'behavior_{self.maintenance_behavior.id}': '4', 'go_to_next': '1',
+        }, follow=True)
+        self.assertRedirects(response, reverse('zoo:training_start'))
+        self.assertContains(response, 'was the last training animal in')
+
 
 @override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
 class KeeperAccessScopingTests(TestCase):
@@ -346,6 +371,37 @@ class KeeperAccessScopingTests(TestCase):
 
         data['form-0-date'] = ''  # invalid row: stays on the calendar with the message, nothing extra saved
         self.assertContains(self.client.post(url, data), 'Please enter a date.')
+
+    def test_save_and_next_calendar_goes_to_the_next_calendar_in_the_string(self):
+        next_calendar = ASG.objects.create(name='Turtle', string=self.string)  # sorts after "Penguin"
+        item = Enrichment.objects.create(name='Ball', photo=make_image_file(name='ball.png'))
+        ASGApprovedItem.objects.create(asg=self.asg, item=item)
+        self.client.force_login(self.assigned_keeper)
+        url = reverse('zoo:calendar_tab', args=[self.asg.id, 2026, 9])
+        self.assertContains(self.client.get(url), 'Save &amp; next calendar (Turtle)')
+
+        data = {
+            'form-TOTAL_FORMS': '1', 'form-INITIAL_FORMS': '0', 'form-MIN_NUM_FORMS': '0', 'form-MAX_NUM_FORMS': '1000',
+            'form-0-date': '2026-09-05', 'form-0-item': str(item.id), 'go_to_next': '1',
+        }
+        response = self.client.post(url, data)
+        self.assertRedirects(response, reverse('zoo:calendar_tab', args=[next_calendar.id, 2026, 9]))
+        self.assertEqual(CalendarEntry.objects.count(), 1)
+
+    def test_save_and_next_calendar_on_the_last_calendar_goes_to_the_calendar_list(self):
+        item = Enrichment.objects.create(name='Ball', photo=make_image_file(name='ball.png'))
+        ASGApprovedItem.objects.create(asg=self.asg, item=item)
+        self.client.force_login(self.assigned_keeper)
+        url = reverse('zoo:calendar_tab', args=[self.asg.id, 2026, 9])
+        self.assertNotContains(self.client.get(url), 'next calendar')
+
+        data = {
+            'form-TOTAL_FORMS': '1', 'form-INITIAL_FORMS': '0', 'form-MIN_NUM_FORMS': '0', 'form-MAX_NUM_FORMS': '1000',
+            'form-0-date': '2026-09-05', 'form-0-item': str(item.id), 'go_to_next': '1',
+        }
+        response = self.client.post(url, data, follow=True)
+        self.assertRedirects(response, reverse('zoo:asg_list'))
+        self.assertContains(response, 'was the last calendar in')
 
     def test_saving_a_date_outside_the_month_shows_an_error(self):
         item = Enrichment.objects.create(name='Ball', photo=make_image_file(name='ball.png'))

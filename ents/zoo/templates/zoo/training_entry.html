@@ -53,6 +53,9 @@
   <div class="form-group mt-3">{{ form.comments.label_tag }} {{ form.comments }}</div>
 
   <button type="submit" class="btn btn-primary">Submit training session</button>
+  {% if next_animal %}
+  <button type="submit" name="go_to_next" value="1" class="btn btn-outline-primary">Submit &amp; next animal ({{ next_animal.name }})</button>
+  {% endif %}
 </form>
 
 <script>

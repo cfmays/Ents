@@ -70,6 +70,7 @@ def calendar_tab(request, asg_id, year=None, month=None):
     FormSet = make_calendar_entry_formset(asg, year, month, extra=max(1, 5 - queryset.count()))
 
     read_only = (year, month) < (today.year, today.month)  # past months can't be changed
+    next_asg = ASG.objects.filter(string=asg.string, name__gt=asg.name).order_by('name').first()
 
     if request.method == 'POST' and read_only:
         messages.warning(request, f'{_month_label(year, month)} is a past month and is read only.')
@@ -86,6 +87,11 @@ def calendar_tab(request, asg_id, year=None, month=None):
             messages.success(request, 'Calendar saved.')
             if request.POST.get('print_after'):
                 return redirect('zoo:calendar_print', asg_id=asg.id, year=year, month=month)
+            if request.POST.get('go_to_next'):
+                if next_asg:
+                    return redirect('zoo:calendar_tab', asg_id=next_asg.id, year=year, month=month)
+                messages.info(request, f'{asg.name} was the last calendar in {asg.string.name}.')
+                return redirect('zoo:asg_list')
             return redirect('zoo:calendar_tab', asg_id=asg.id, year=year, month=month)
     else:
         formset = FormSet(queryset=queryset)
@@ -110,6 +116,7 @@ def calendar_tab(request, asg_id, year=None, month=None):
             for entry in queryset.select_related('item', 'animal', 'behavior_goal')
         ] if read_only else [],
         'formset': formset,
+        'next_asg': next_asg,
         'year': year,
         'month': month,
         'month_name': month_start.strftime('%B %Y'),
@@ -393,6 +400,7 @@ def training_history(request, animal_id):
 def training_entry(request, animal_id):
     animal = _get_accessible_training_animal(request, animal_id)
     profile, _ = Profile.objects.get_or_create(user=request.user)
+    next_animal = TrainingAnimal.objects.filter(string=animal.string, name__gt=animal.name).order_by('name').first()
 
     if request.method == 'POST':
         form = TrainingSessionForm(request.POST, animal=animal)
@@ -417,11 +425,15 @@ def training_entry(request, animal_id):
             profile.save()
 
             messages.success(request, f'Training session for {animal} saved.')
+            if request.POST.get('go_to_next'):
+                if next_animal:
+                    return redirect('zoo:training_entry', animal_id=next_animal.id)
+                messages.info(request, f'{animal.name} was the last training animal in {animal.string.name}.')
             return redirect('zoo:training_start')
     else:
         form = TrainingSessionForm(animal=animal, initial={'date': date.today()})
 
-    return render(request, 'zoo/training_entry.html', {'animal': animal, 'form': form})
+    return render(request, 'zoo/training_entry.html', {'animal': animal, 'form': form, 'next_animal': next_animal})
 
 
 @supervisor_required

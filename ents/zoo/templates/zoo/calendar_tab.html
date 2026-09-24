@@ -164,6 +164,9 @@
   </table>
   <button type="button" id="add-row-btn" class="btn btn-outline-secondary calendar-btn">+ Add row</button>
   <button type="submit" class="btn btn-primary calendar-btn">Save changes</button>
+  {% if next_asg %}
+  <button type="button" id="save-next-btn" class="btn btn-outline-primary calendar-btn">Save &amp; next calendar ({{ next_asg.name }})</button>
+  {% endif %}
   <span style="float:right">
     <span id="clipboard-note" class="text-muted small" style="margin-right:8px">{% if clipboard %}Copied: {{ clipboard }}{% endif %}</span>
     <button type="button" id="copy-btn" class="btn btn-outline-secondary calendar-btn">Copy</button>
@@ -309,6 +312,11 @@
   });
   $("#save-and-print").click(function () {
     $('<input type="hidden" name="print_after" value="1">').appendTo("#calendar-form");
+    $("#calendar-form")[0].requestSubmit();
+  });
+
+  $("#save-next-btn").click(function () {
+    $('<input type="hidden" name="go_to_next" value="1">').appendTo("#calendar-form");
     $("#calendar-form")[0].requestSubmit();
   });
 
