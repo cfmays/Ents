@@ -1,5 +1,6 @@
 import calendar
 import re
+from collections import defaultdict
 from datetime import date
 
 from django.contrib import messages
@@ -393,6 +394,22 @@ def training_ajax_animals_for_string(request):
     return render(request, 'zoo/animal_options.html', {'animals': animals})
 
 
+def _behavior_chart_data(animal):
+    """Each behavior's score over time, for the History page's graph: one small chart per
+    behavior (a combined chart reads as chaos once several behaviors' lines cross)."""
+    scores = BehaviorScore.objects.filter(session__animal=animal).select_related('behavior', 'session').order_by('session__date')
+    by_behavior = defaultdict(list)
+    for score in scores:
+        by_behavior[score.behavior.name].append((score.session.date.isoformat(), score.score))
+
+    return {
+        'behaviors': [
+            {'name': name, 'labels': [date for date, _ in points], 'data': [score for _, score in points]}
+            for name, points in sorted(by_behavior.items(), key=lambda kv: -len(kv[1]))
+        ],
+    }
+
+
 @login_required
 def training_history(request, animal_id):
     animal = _get_accessible_training_animal(request, animal_id)
@@ -400,7 +417,9 @@ def training_history(request, animal_id):
         'behavior_scores__behavior',
     )
     page_obj = Paginator(sessions, 50).get_page(request.GET.get('page'))
-    return render(request, 'zoo/training_history.html', {'animal': animal, 'page_obj': page_obj})
+    return render(request, 'zoo/training_history.html', {
+        'animal': animal, 'page_obj': page_obj, 'chart_data': _behavior_chart_data(animal),
+    })
 
 
 @login_required

@@ -1,53 +1,180 @@
 {% extends "base_generic.html" %}
 
 {% block content %}
+<style>
+  .view-toggle .btn { margin-right: 6px; }
+  .viz-root {
+    --surface-1: #fcfcfb;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --gridline: #e1e0d9;
+    --axis: #c3c2b7;
+  }
+  #graph-view { background: var(--surface-1); border: 1px solid var(--gridline); border-radius: 6px; padding: 16px; }
+  .behavior-chart-card { margin-bottom: 20px; }
+  .behavior-chart-card h6 { margin-bottom: 4px; color: var(--text-secondary); }
+  .behavior-chart-card canvas { max-height: 210px; }
+  .print-only { display: none; }
+  @media print {
+    .screen-only, nav.navbar { display: none !important; }
+    .print-only { display: table-row; }
+    /* the table is too wide for portrait, so columns are constrained to wrap instead
+       of overflowing; comments move to their own full-width row (see print-only below)
+       rather than wrapping several times over in a narrow column */
+    @page { size: landscape; }
+    #table-view table { font-size: 10px; table-layout: fixed; width: 100%; }
+    #table-view td, #table-view th { padding: 2px 4px; overflow-wrap: break-word; }
+    #table-view .comment-row td { padding-top: 0; font-style: italic; color: #52514e; border-top: 0; }
+    #table-view tr.has-comment-row td { border-bottom: 0; }
+    /* one chart per row: side-by-side columns leave each canvas too little width to
+       resize into, and they end up overlapping */
+    #graph-view .row { display: block; }
+    #graph-view .behavior-chart-card { width: 100%; max-width: 100%; flex: none; page-break-inside: avoid; }
+  }
+</style>
+
 <h1>{{ animal.name }} &mdash; History</h1>
-<p><a href="{% url 'zoo:training_entry' animal.id %}">Back to training log</a></p>
+<p class="screen-only"><a href="{% url 'zoo:training_entry' animal.id %}">Back to training log</a></p>
 
-<table class="table table-sm">
-  <thead>
-    <tr>
-      <th>Date</th>
-      <th>Trainer</th>
-      <th>Minutes</th>
-      <th>Overall</th>
-      <th>Aggression</th>
-      <th>Appetite</th>
-      <th>Reinforcers</th>
-      <th>Behavior scores</th>
-      <th>Comments</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for session in page_obj %}
-    <tr>
-      <td>{{ session.date }}</td>
-      <td>{{ session.trainer.username|capfirst|default:"" }}</td>
-      <td>{{ session.session_length_minutes|default_if_none:"" }}</td>
-      <td>{{ session.overall_rating|default_if_none:"" }}</td>
-      <td>{{ session.aggression_level|default_if_none:"" }}</td>
-      <td>{{ session.appetite_level|default_if_none:"" }}</td>
-      <td>{% for r in session.reinforcers %}{{ r }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
-      <td>{% for score in session.behavior_scores.all %}{{ score.behavior.name }}: {{ score.score }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</td>
-      <td>{{ session.comments }}</td>
-    </tr>
-    {% empty %}
-    <tr><td colspan="9"><em>No training sessions logged yet.</em></td></tr>
+<p class="view-toggle screen-only">
+  <button type="button" id="show-table-btn" class="btn btn-sm btn-primary">Table</button>
+  <button type="button" id="show-graph-btn" class="btn btn-sm btn-outline-secondary">Graph</button>
+  <button type="button" id="print-btn" class="btn btn-sm btn-outline-secondary">Print</button>
+</p>
+
+<div id="table-view">
+  <table class="table table-sm">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Trainer</th>
+        <th>Minutes</th>
+        <th>Overall</th>
+        <th>Aggression</th>
+        <th>Appetite</th>
+        <th>Reinforcers</th>
+        <th>Behavior scores</th>
+        <th class="screen-only">Comments</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for session in page_obj %}
+      <tr{% if session.comments %} class="has-comment-row"{% endif %}>
+        <td>{{ session.date }}</td>
+        <td>{{ session.trainer.username|capfirst|default:"" }}</td>
+        <td>{{ session.session_length_minutes|default_if_none:"" }}</td>
+        <td>{{ session.overall_rating|default_if_none:"" }}</td>
+        <td>{{ session.aggression_level|default_if_none:"" }}</td>
+        <td>{{ session.appetite_level|default_if_none:"" }}</td>
+        <td>{% for r in session.reinforcers %}{{ r }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
+        <td>{% for score in session.behavior_scores.all %}{{ score.behavior.name }}: {{ score.score }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</td>
+        <td class="screen-only">{{ session.comments }}</td>
+      </tr>
+      {% if session.comments %}
+      <tr class="print-only comment-row"><td colspan="8"><em>Comment:</em> {{ session.comments }}</td></tr>
+      {% endif %}
+      {% empty %}
+      <tr><td colspan="9"><em>No training sessions logged yet.</em></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if page_obj.has_other_pages %}
+  <nav class="screen-only">
+    <ul class="pagination">
+      {% if page_obj.has_previous %}
+      <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a></li>
+      {% endif %}
+      <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+      {% if page_obj.has_next %}
+      <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a></li>
+      {% endif %}
+    </ul>
+  </nav>
+  {% endif %}
+</div>
+
+<div id="graph-view" class="viz-root" style="display:none">
+  {% if chart_data.behaviors %}
+  <div class="row">
+    {% for behavior in chart_data.behaviors %}
+    <div class="col-md-4 col-sm-6 behavior-chart-card">
+      <h6>{{ behavior.name }}</h6>
+      <canvas class="behavior-chart" data-index="{{ forloop.counter0 }}"></canvas>
+    </div>
     {% endfor %}
-  </tbody>
-</table>
+  </div>
+  {% else %}
+  <p class="text-muted mb-0"><em>No behavior scores logged yet.</em></p>
+  {% endif %}
+</div>
+{{ chart_data|json_script:"chart-data" }}
 
-{% if page_obj.has_other_pages %}
-<nav>
-  <ul class="pagination">
-    {% if page_obj.has_previous %}
-    <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a></li>
-    {% endif %}
-    <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
-    {% if page_obj.has_next %}
-    <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a></li>
-    {% endif %}
-  </ul>
-</nav>
-{% endif %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+  // this app's validated categorical palette (light mode); a small multiple is a single
+  // series, so every chart uses the same slot 1 hue - the title, not color, says which is which
+  var CHART_COLOR = '#2a78d6';
+
+  var chartsBuilt = false;
+  function buildCharts() {
+    if (chartsBuilt) { return; }
+    chartsBuilt = true;
+    var data = JSON.parse(document.getElementById('chart-data').textContent);
+    $(".behavior-chart").each(function () {
+      var behavior = data.behaviors[$(this).data("index")];
+      new Chart(this, {
+        type: 'line',
+        data: {
+          labels: behavior.labels,
+          datasets: [{
+            data: behavior.data,
+            borderColor: CHART_COLOR,
+            backgroundColor: CHART_COLOR,
+            pointBackgroundColor: CHART_COLOR,
+            pointBorderColor: '#fcfcfb',
+            pointBorderWidth: 2,
+            pointRadius: 4,
+            borderWidth: 2,
+            tension: 0,
+          }],
+        },
+        options: {
+          interaction: { mode: 'index', intersect: false },
+          scales: {
+            y: {
+              min: 1, max: 5, ticks: { stepSize: 1, color: '#898781' },
+              grid: { color: '#e1e0d9' },
+            },
+            x: {
+              ticks: { color: '#898781', minRotation: 60, maxRotation: 60, autoSkip: true, maxTicksLimit: 4 },
+              grid: { display: false },
+            },
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: { mode: 'index', intersect: false },
+          },
+        },
+      });
+    });
+  }
+
+  $("#show-table-btn").click(function () {
+    $("#table-view").show();
+    $("#graph-view").hide();
+    $(this).removeClass("btn-outline-secondary").addClass("btn-primary");
+    $("#show-graph-btn").removeClass("btn-primary").addClass("btn-outline-secondary");
+  });
+  $("#show-graph-btn").click(function () {
+    $("#table-view").hide();
+    $("#graph-view").show();
+    $(this).removeClass("btn-outline-secondary").addClass("btn-primary");
+    $("#show-table-btn").removeClass("btn-primary").addClass("btn-outline-secondary");
+    buildCharts();
+  });
+  $("#print-btn").click(function () {
+    window.print();
+  });
+</script>
 {% endblock %}

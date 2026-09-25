@@ -10,7 +10,7 @@ from django.urls import reverse
 from ents.models import Enrichment
 from ents.tests import make_image_file
 
-from .models import SpecialConcern, ASG, ASGApprovedItem, Animal, Behavior, BehaviorGoal, BehaviorScore, CalendarEntry, Division, Reinforcer, String, TrainingAnimal
+from .models import SpecialConcern, ASG, ASGApprovedItem, Animal, Behavior, BehaviorGoal, BehaviorScore, CalendarEntry, Division, Reinforcer, String, TrainingAnimal, TrainingSession
 
 TEST_MEDIA_ROOT = tempfile.mkdtemp(prefix='zoo_test_media_')
 
@@ -87,6 +87,46 @@ class TrainingFlowTests(TestCase):
         other = User.objects.create_user('other', password='pw')
         self.client.force_login(other)
         self.assertEqual(self.client.get(reverse('zoo:training_history', args=[self.animal.id])).status_code, 200)
+
+    def test_training_history_offers_table_and_graph_with_chart_data(self):
+        session = TrainingSession.objects.create(animal=self.animal, date='2026-09-01')
+        BehaviorScore.objects.create(session=session, behavior=self.maintenance_behavior, score=3)
+        session2 = TrainingSession.objects.create(animal=self.animal, date='2026-09-08')
+        BehaviorScore.objects.create(session=session2, behavior=self.maintenance_behavior, score=5)
+
+        self.client.force_login(self.keeper)
+        page = self.client.get(reverse('zoo:training_history', args=[self.animal.id]))
+        self.assertContains(page, '>Table<')
+        self.assertContains(page, '>Graph<')
+        self.assertContains(page, '>Print<')
+        self.assertContains(page, '"name": "Target"')
+        self.assertContains(page, '"labels": ["2026-09-01", "2026-09-08"]')
+        self.assertContains(page, '"data": [3, 5]')
+
+    def test_training_history_comments_get_their_own_print_row(self):
+        with_comment = TrainingSession.objects.create(animal=self.animal, date='2026-09-01', comments='Walked away twice')
+        TrainingSession.objects.create(animal=self.animal, date='2026-09-08')  # no comment: no extra row
+
+        self.client.force_login(self.keeper)
+        page = self.client.get(reverse('zoo:training_history', args=[self.animal.id]))
+        self.assertContains(page, '<tr class="print-only comment-row"><td colspan="8"><em>Comment:</em> Walked away twice</td></tr>')
+        self.assertContains(page, '<tr class="print-only comment-row">', count=1)  # only the commented session gets a row
+        self.assertContains(page, '<tr class="has-comment-row">', count=1)  # its own row drops the border shared with the comment
+
+    def test_training_history_graph_is_one_chart_per_behavior_most_scored_first(self):
+        session = TrainingSession.objects.create(animal=self.animal, date='2026-09-01')
+        BehaviorScore.objects.create(session=session, behavior=self.maintenance_behavior, score=4)
+        rare_behavior = Behavior.objects.create(name='Rare', behavior_type='maintenance')
+        BehaviorScore.objects.create(session=session, behavior=rare_behavior, score=2)
+        session2 = TrainingSession.objects.create(animal=self.animal, date='2026-09-08')
+        BehaviorScore.objects.create(session=session2, behavior=self.maintenance_behavior, score=5)
+
+        self.client.force_login(self.keeper)
+        page = self.client.get(reverse('zoo:training_history', args=[self.animal.id]))
+        names = [b['name'] for b in page.context['chart_data']['behaviors']]
+        self.assertEqual(names, ['Target', 'Rare'])  # Target has 2 scores, Rare has 1
+        self.assertContains(page, '<h6>Target</h6>')
+        self.assertContains(page, '<h6>Rare</h6>')
 
     def test_training_form_warns_before_leaving_with_unsaved_changes(self):
         self.client.force_login(self.keeper)
