@@ -18,6 +18,7 @@
   .goal-select2-dropdown .select2-results__option { white-space: normal; }
   select[name$="behavior_goal"] { width: 280px; }
   input[name$="-date"] { width: 151px; }
+  input.initials-input { width: 45px; }
 
   .alert-danger { overflow-wrap: anywhere; }
 
@@ -86,6 +87,7 @@
   <thead>
     <tr>
       <th>Date</th>
+      <th>Init</th>
       {% if has_animals %}<th>Animal</th>{% endif %}
       <th>Enrichment item</th>
       <th>Behavior goal</th>
@@ -97,6 +99,7 @@
     {% for entry, label in read_only_rows %}
     <tr>
       <td>{{ entry.date|date:"D n/j" }}</td>
+      <td>{{ entry.initials }}</td>
       {% if has_animals %}<td>{{ entry.animal|default:"" }}</td>{% endif %}
       <td>{{ label }}</td>
       <td>{{ entry.behavior_goal|default:"" }}</td>
@@ -106,7 +109,7 @@
       <td>{{ entry.notes }}</td>
     </tr>
     {% empty %}
-    <tr><td colspan="8"><em>No entries in {{ month_name }}.</em></td></tr>
+    <tr><td colspan="9"><em>No entries in {{ month_name }}.</em></td></tr>
     {% endfor %}
   </tbody>
 </table>
@@ -123,6 +126,7 @@
     <thead>
       <tr>
         <th>Date</th>
+        <th>Init</th>
         {% if has_animals %}<th>Animal</th>{% endif %}
         <th>Enrichment item</th>
         <th>Behavior goal</th>
@@ -137,6 +141,7 @@
       <tr>
         {{ form.id }}
         <td>{{ form.date }}</td>
+        <td>{{ form.initials }}</td>
         {% if has_animals %}<td>{{ form.animal }}</td>{% endif %}
         <td>{{ form.item }}</td>
         <td>{{ form.behavior_goal }}</td>
@@ -146,12 +151,13 @@
         <td>{{ form.notes }}</td>
       </tr>
       {% if form.errors %}
-      <tr class="row-error"><td colspan="{% if has_animals %}8{% else %}7{% endif %}" class="text-danger py-0"><strong>{% for errs in form.errors.values %}{{ errs|join:" " }} {% endfor %}</strong></td></tr>
+      <tr class="row-error"><td colspan="{% if has_animals %}9{% else %}8{% endif %}" class="text-danger py-0"><strong>{% for errs in form.errors.values %}{{ errs|join:" " }} {% endfor %}</strong></td></tr>
       {% endif %}
       {% endfor %}
       <tr id="empty-form-row" style="display:none">
         {{ formset.empty_form.id }}
         <td>{{ formset.empty_form.date }}</td>
+        <td>{{ formset.empty_form.initials }}</td>
         {% if has_animals %}<td>{{ formset.empty_form.animal }}</td>{% endif %}
         <td>{{ formset.empty_form.item }}</td>
         <td>{{ formset.empty_form.behavior_goal }}</td>

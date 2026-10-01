@@ -35,9 +35,10 @@ def make_calendar_entry_form(asg, year, month):
     class CalendarEntryForm(forms.ModelForm):
         class Meta:
             model = CalendarEntry
-            fields = ['date', 'animal', 'item', 'behavior_goal', 'do_score', 'io_score', 'gbs_score', 'notes']
+            fields = ['date', 'initials', 'animal', 'item', 'behavior_goal', 'do_score', 'io_score', 'gbs_score', 'notes']
             widgets = {
                 'date': forms.DateInput(attrs={'type': 'date'}),
+                'initials': forms.TextInput(attrs={'class': 'initials-input'}),
                 'item': EnrichmentSelect(attrs={'class': 'item-select'}),
                 'notes': forms.TextInput(),
                 'do_score': forms.Select(attrs={'class': 'score-select'}),

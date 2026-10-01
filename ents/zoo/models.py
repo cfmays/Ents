@@ -201,6 +201,7 @@ class CalendarEntry(models.Model):
     asg = models.ForeignKey(ASG, on_delete=models.CASCADE, related_name='calendar_entries', verbose_name='calendar')
     animal = models.ForeignKey(Animal, on_delete=models.SET_NULL, null=True, blank=True, related_name='calendar_entries')
     date = models.DateField()
+    initials = models.CharField(max_length=2, blank=True, verbose_name='init')
     item = models.ForeignKey(Enrichment, on_delete=models.PROTECT, related_name='calendar_entries')
     behavior_goal = models.ForeignKey(BehaviorGoal, on_delete=models.SET_NULL, null=True, blank=True)
     do_score = models.IntegerField(choices=DO_CHOICES, null=True, blank=True)
@@ -216,6 +217,10 @@ class CalendarEntry(models.Model):
 
     def __str__(self):
         return f"{self.asg} {self.date} {self.item}"
+
+    def save(self, *args, **kwargs):
+        self.initials = self.initials.upper()
+        super().save(*args, **kwargs)
 
 
 class TrainingSession(models.Model):

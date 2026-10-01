@@ -321,6 +321,22 @@ class KeeperAccessScopingTests(TestCase):
         response = self.client.post(reverse('zoo:calendar_tab', args=[self.asg.id]), data)
         self.assertContains(response, 'Please choose an enrichment item.')
 
+    def test_calendar_saves_initials_and_shows_the_column_between_date_and_animal(self):
+        item = Enrichment.objects.create(name='Ball', photo=make_image_file(name='ball.png'))
+        ASGApprovedItem.objects.create(asg=self.asg, item=item)
+        self.client.force_login(self.assigned_keeper)
+        url = reverse('zoo:calendar_tab', args=[self.asg.id])
+
+        page = self.client.get(url)
+        self.assertLess(page.content.decode().index('>Init<'), page.content.decode().index('>Enrichment item<'))
+
+        data = {
+            'form-TOTAL_FORMS': '1', 'form-INITIAL_FORMS': '0', 'form-MIN_NUM_FORMS': '0', 'form-MAX_NUM_FORMS': '1000',
+            'form-0-date': '2026-09-02', 'form-0-item': str(item.id), 'form-0-initials': 'jd',
+        }
+        self.client.post(url, data)
+        self.assertEqual(CalendarEntry.objects.get().initials, 'JD')  # always stored upper case
+
     def test_blank_rows_fill_up_to_five_with_at_least_one(self):
         item = Enrichment.objects.create(name='Ball', photo=make_image_file(name='ball.png'))
         ASGApprovedItem.objects.create(asg=self.asg, item=item)
