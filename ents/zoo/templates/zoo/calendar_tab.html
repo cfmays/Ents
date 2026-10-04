@@ -19,6 +19,7 @@
   select[name$="behavior_goal"] { width: 280px; }
   input[name$="-date"] { width: 151px; }
   input.initials-input { width: 45px; }
+  .combine-cell { text-align: center; }
 
   .alert-danger { overflow-wrap: anywhere; }
 
@@ -128,6 +129,7 @@
         <th>Date</th>
         <th>Init</th>
         {% if has_animals %}<th>Animal</th>{% endif %}
+        <th>+</th>
         <th>Enrichment item</th>
         <th>Behavior goal</th>
         <th>DO</th>
@@ -143,6 +145,7 @@
         <td>{{ form.date }}</td>
         <td>{{ form.initials }}</td>
         {% if has_animals %}<td>{{ form.animal }}</td>{% endif %}
+        <td class="combine-cell"><input type="checkbox" name="combine" value="{{ forloop.counter0 }}" style="display:none"></td>
         <td>{{ form.item }}</td>
         <td>{{ form.behavior_goal }}</td>
         <td>{{ form.do_score }}</td>
@@ -151,7 +154,7 @@
         <td>{{ form.notes }}</td>
       </tr>
       {% if form.errors %}
-      <tr class="row-error"><td colspan="{% if has_animals %}9{% else %}8{% endif %}" class="text-danger py-0"><strong>{% for errs in form.errors.values %}{{ errs|join:" " }} {% endfor %}</strong></td></tr>
+      <tr class="row-error"><td colspan="{% if has_animals %}10{% else %}9{% endif %}" class="text-danger py-0"><strong>{% for errs in form.errors.values %}{{ errs|join:" " }} {% endfor %}</strong></td></tr>
       {% endif %}
       {% endfor %}
       <tr id="empty-form-row" style="display:none">
@@ -159,6 +162,7 @@
         <td>{{ formset.empty_form.date }}</td>
         <td>{{ formset.empty_form.initials }}</td>
         {% if has_animals %}<td>{{ formset.empty_form.animal }}</td>{% endif %}
+        <td class="combine-cell"><input type="checkbox" name="combine" value="__prefix__" style="display:none"></td>
         <td>{{ formset.empty_form.item }}</td>
         <td>{{ formset.empty_form.behavior_goal }}</td>
         <td>{{ formset.empty_form.do_score }}</td>
@@ -170,6 +174,7 @@
   </table>
   <button type="button" id="add-row-btn" class="btn btn-outline-secondary calendar-btn">+ Add row</button>
   <button type="submit" class="btn btn-primary calendar-btn">Save changes</button>
+  <button type="submit" name="action" value="combine" class="btn btn-outline-secondary calendar-btn">Combine checked items</button>
   {% if next_asg %}
   <button type="button" id="save-next-btn" class="btn btn-outline-primary calendar-btn">Save &amp; next calendar ({{ next_asg.name }})</button>
   {% endif %}
@@ -259,12 +264,40 @@
     initScoreSelect2($newRow.find(".score-select"));
     initGoalSelect2($newRow.find('select[name$="behavior_goal"]'));
     totalForms.val(newIndex + 1);
+    recomputeCombinable();
     return $newRow;
   }
 
   $("#add-row-btn").click(function () {
     addRow();
   });
+
+  // show a row's "+" checkbox as soon as it shares a date (and animal, if this calendar has
+  // animal choices) with another row on the page — no need to save first
+  function recomputeCombinable() {
+    var groups = {};
+    $("table tbody tr").not("#empty-form-row").each(function () {
+      var $row = $(this);
+      var date = $row.find('input[name$="-date"]').val();
+      var $animal = $row.find('select[name$="-animal"]');
+      var $checkbox = $row.find(".combine-cell input[type=checkbox]");
+      if (!date) {
+        $checkbox.prop("checked", false).hide();
+        return;
+      }
+      var key = date + "|" + ($animal.length ? $animal.val() : "");
+      (groups[key] = groups[key] || []).push($checkbox);
+    });
+    $.each(groups, function (key, checkboxes) {
+      if (checkboxes.length > 1) {
+        checkboxes.forEach(function ($checkbox) { $checkbox.show(); });
+      } else {
+        checkboxes.forEach(function ($checkbox) { $checkbox.prop("checked", false).hide(); });
+      }
+    });
+  }
+  $("table tbody").on("input change", 'input[name$="-date"], select[name$="-animal"]', recomputeCombinable);
+  recomputeCombinable();
 
   // Click an item's thumbnail (closed box or open list) to see its photo full size, with the item's name and note
   function closePhoto() { $("#photo-overlay").hide(); }

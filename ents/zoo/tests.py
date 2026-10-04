@@ -337,6 +337,68 @@ class KeeperAccessScopingTests(TestCase):
         self.client.post(url, data)
         self.assertEqual(CalendarEntry.objects.get().initials, 'JD')  # always stored upper case
 
+    def test_combine_checkboxes_are_present_for_every_row_keyed_by_form_index(self):
+        # which checkboxes to actually show (2+ rows sharing a date/animal) is done live in
+        # JS as the keeper edits, not server-side, so here we just confirm every row gets one,
+        # hidden by default, keyed by its form index rather than the (possibly not-yet-saved) entry
+        ball = Enrichment.objects.create(name='Ball', photo=make_image_file(name='b.png'))
+        CalendarEntry.objects.create(asg=self.asg, date='2026-09-02', item=ball)
+
+        self.client.force_login(self.assigned_keeper)
+        page = self.client.get(reverse('zoo:calendar_tab', args=[self.asg.id])).content.decode()
+        self.assertIn('>+<', page)
+        self.assertIn('name="combine" value="0" style="display:none"', page)
+        self.assertIn('Combine checked items', page)
+
+    def test_combine_checked_items_creates_a_combined_item_and_removes_the_others(self):
+        ball = Enrichment.objects.create(name='Ball', photo=make_image_file(name='b.png'))
+        firehose = Enrichment.objects.create(name='Firehose', photo=make_image_file(name='f.png'))
+        ASGApprovedItem.objects.create(asg=self.asg, item=ball)
+        ASGApprovedItem.objects.create(asg=self.asg, item=firehose)
+        first = CalendarEntry.objects.create(asg=self.asg, date='2026-09-03', item=ball, notes='chewed it', initials='JD')
+        second = CalendarEntry.objects.create(asg=self.asg, date='2026-09-03', item=firehose)
+        self.client.force_login(self.assigned_keeper)
+        url = reverse('zoo:calendar_tab', args=[self.asg.id])
+
+        data = {
+            'form-TOTAL_FORMS': '5', 'form-INITIAL_FORMS': '2', 'form-MIN_NUM_FORMS': '0', 'form-MAX_NUM_FORMS': '1000',
+            'form-0-id': str(first.id), 'form-0-date': '2026-09-03', 'form-0-initials': 'JD', 'form-0-item': str(ball.id),
+            'form-0-notes': 'chewed it',
+            'form-1-id': str(second.id), 'form-1-date': '2026-09-03', 'form-1-item': str(firehose.id),
+            'action': 'combine', 'combine': ['0', '1'],
+        }
+        response = self.client.post(url, data, follow=True)
+        self.assertContains(response, 'Combined 2 items into &quot;Ball + Firehose&quot;.')
+
+        self.assertEqual(CalendarEntry.objects.count(), 1)
+        merged = CalendarEntry.objects.get()
+        self.assertEqual(merged.id, first.id)  # the earlier entry is kept and repointed
+        self.assertEqual(merged.notes, 'chewed it')
+        self.assertEqual(merged.initials, 'JD')
+        self.assertEqual(merged.item.name, 'Ball + Firehose')
+        self.assertEqual(set(merged.item.components.all()), {ball, firehose})
+        self.assertTrue(ASGApprovedItem.objects.filter(asg=self.asg, item=merged.item).exists())
+
+    def test_combine_refuses_entries_for_different_dates_or_animals(self):
+        ball = Enrichment.objects.create(name='Ball', photo=make_image_file(name='b.png'))
+        firehose = Enrichment.objects.create(name='Firehose', photo=make_image_file(name='f.png'))
+        ASGApprovedItem.objects.create(asg=self.asg, item=ball)
+        ASGApprovedItem.objects.create(asg=self.asg, item=firehose)
+        e1 = CalendarEntry.objects.create(asg=self.asg, date='2026-09-02', item=ball)
+        e2 = CalendarEntry.objects.create(asg=self.asg, date='2026-09-03', item=firehose)
+        self.client.force_login(self.assigned_keeper)
+        url = reverse('zoo:calendar_tab', args=[self.asg.id])
+
+        data = {
+            'form-TOTAL_FORMS': '5', 'form-INITIAL_FORMS': '2', 'form-MIN_NUM_FORMS': '0', 'form-MAX_NUM_FORMS': '1000',
+            'form-0-id': str(e1.id), 'form-0-date': '2026-09-02', 'form-0-item': str(ball.id),
+            'form-1-id': str(e2.id), 'form-1-date': '2026-09-03', 'form-1-item': str(firehose.id),
+            'action': 'combine', 'combine': ['0', '1'],
+        }
+        response = self.client.post(url, data, follow=True)
+        self.assertContains(response, 'Checked items must be for the same animal and the same day.')
+        self.assertEqual(CalendarEntry.objects.count(), 2)
+
     def test_blank_rows_fill_up_to_five_with_at_least_one(self):
         item = Enrichment.objects.create(name='Ball', photo=make_image_file(name='ball.png'))
         ASGApprovedItem.objects.create(asg=self.asg, item=item)

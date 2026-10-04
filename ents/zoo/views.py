@@ -85,6 +85,12 @@ def calendar_tab(request, asg_id, year=None, month=None):
                 if not instance.created_by_id:
                     instance.created_by = request.user
                 instance.save()
+            if request.POST.get('action') == 'combine':
+                # the combine checkboxes are keyed by form index (so they also work for rows
+                # that were just typed in and saved in this same request, not just old ones)
+                index_to_pk = {str(i): form.instance.pk for i, form in enumerate(formset.forms) if form.instance.pk}
+                ids = [index_to_pk[i] for i in request.POST.getlist('combine') if i in index_to_pk]
+                return _combine_entries(request, asg, year, month, ids)
             messages.success(request, 'Calendar saved.')
             if request.POST.get('print_after'):
                 return redirect('zoo:calendar_print', asg_id=asg.id, year=year, month=month)
@@ -134,6 +140,38 @@ def _entries(n):
 
 def _month_label(year, month):
     return date(year, month, 1).strftime('%B %Y')
+
+
+def _unique_combo_name(names):
+    """A name for a new combined item, made from its components' names, that isn't already taken."""
+    base = ' + '.join(names)[:255]
+    name, suffix_n = base, 2
+    while Enrichment.objects.filter(name__iexact=name).exists():
+        suffix = f' ({suffix_n})'
+        name = base[:255 - len(suffix)] + suffix
+        suffix_n += 1
+    return name
+
+
+def _combine_entries(request, asg, year, month, ids):
+    """Combine 2+ checked calendar entries (same date, same animal) into one entry using a
+    new combined item made of the checked items; the other entries are removed."""
+    entries = list(CalendarEntry.objects.filter(asg=asg, pk__in=ids).select_related('item'))
+    if len(entries) < 2:
+        messages.warning(request, 'Check at least 2 items to combine.')
+    elif len({e.date for e in entries}) > 1 or len({e.animal_id for e in entries}) > 1:
+        messages.warning(request, 'Checked items must be for the same animal and the same day.')
+    else:
+        entries.sort(key=lambda e: e.id)
+        base, extras = entries[0], entries[1:]
+        new_item = Enrichment.objects.create(name=_unique_combo_name(e.item.name for e in entries))
+        new_item.components.set([e.item for e in entries])
+        ASGApprovedItem.objects.get_or_create(asg=asg, item=new_item, defaults={'is_food': default_is_food(new_item)})
+        base.item = new_item
+        base.save()
+        CalendarEntry.objects.filter(pk__in=[e.id for e in extras]).delete()
+        messages.success(request, f'Combined {len(entries)} items into "{new_item.name}".')
+    return redirect('zoo:calendar_tab', asg_id=asg.id, year=year, month=month)
 
 
 @login_required
