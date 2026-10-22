@@ -1,2 +1,19 @@
 # copy of the production db (has user accounts and password hashes)
 /db.sqlite3
+
+# other database copies
+/newdb.sqlite3
+
+# Mac folder settings
+.DS_Store
+
+# source spreadsheets, PDFs and screenshots used for the data imports
+/*.xlsx
+/*.pdf
+/*.png
+
+# raw photo folder for the Unassigned photos section
+/enrichments/
+
+# reports written by the import scripts
+/*.txt

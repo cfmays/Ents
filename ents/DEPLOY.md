@@ -52,7 +52,7 @@ git commit -m "<what changed>"
 git push
 ```
 
-## 2. Log in to the server
+## 2. Log in to the server and activate the virtual environment
 
 ```
 ssh charley@<droplet-ip>
@@ -60,8 +60,12 @@ cd /home/charley/Ents/ents
 source /home/charley/vents/bin/activate
 ```
 
-The prompt should now start with `(vents)`. Run the rest of the steps from this
-same terminal. If you open a new one, run these three lines again first.
+The `source` line activates the virtual environment. The prompt should now
+start with `(vents)`. Without it, `python3 manage.py ...` fails with
+`No module named 'django'` or `No module named 'environ'`.
+
+Run the rest of the steps from this same terminal. If you open a new one, run
+these three lines again first.
 
 ## 3. Back up the database and photos
 
@@ -80,6 +84,8 @@ Old backups pile up, so now and then delete the old ones:
 `ls -lt ~/ents-backups` lists the newest first.
 
 ## 4. Get the new code
+
+First make sure you're in the venv; see step 2
 
 ```
 cd /home/charley/Ents
@@ -155,6 +161,7 @@ Common problems:
 ## Rolling back
 
 Use this if the new version is broken and you can't fix it quickly.
+If you're in a new terminal, run the three lines from step 2 first.
 
 1. Go back to the code that was running before. `git log --oneline -5` shows
    the recent commits; pick the one before your deploy:
@@ -207,7 +214,7 @@ DO control panel. Taking a snapshot before a big change is a good habit.
 
 ## Other handy commands on the server
 
-Run these from `/home/charley/Ents/ents` with `(vents)` active.
+Run these after the three lines from step 2 (so the prompt starts with `(vents)`).
 
 | Task | Command |
 |---|---|
