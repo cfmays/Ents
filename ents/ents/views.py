@@ -3,6 +3,7 @@ import re
 from pathlib import Path
 
 from django.conf import settings
+from django.db.models import Count
 from django.contrib import messages
 from django.core.files import File
 from django.core.files.storage import default_storage
@@ -98,6 +99,11 @@ def items_master_list_print(request):
     return render(request, 'items_master_list_print.html', {'rows': rows})
 
 
+def _items_with_combined_flag():
+    """Every item, with component_count > 0 for combined items (they're left out of the "Made of" lists)."""
+    return Enrichment.objects.annotate(component_count=Count('components'))
+
+
 def _manage_item(request, item, action):
     """Rename, replace the photo of, set the components of, or delete the selected item; then go back to Manage Items."""
     manage = reverse('createView')
@@ -182,7 +188,7 @@ def EnrichmentUploadView(request):
             return HttpResponseRedirect(reverse('createView'))
         form = CreateEnrichmentForm()
         return render(request, 'createEnrichment.html', {
-            'form': form, 'item': item, 'items': Enrichment.objects.all(), 'calendars': 0, 'entries': 0,
+            'form': form, 'item': item, 'items': _items_with_combined_flag(), 'calendars': 0, 'entries': 0,
             'assign_form': assign_form, 'unassigned_photos': _unassigned_photo_files(),
         })
 
@@ -201,7 +207,7 @@ def EnrichmentUploadView(request):
     return render(request, 'createEnrichment.html', {
         'form': form,
         'item': item,
-        'items': Enrichment.objects.all(),
+        'items': _items_with_combined_flag(),
         'calendars': calendars,
         'entries': entries,
         'assign_form': assign_form,

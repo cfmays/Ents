@@ -41,7 +41,7 @@
 <h4 id="pick-heading">Select an existing item</h4>
 <select id="pick-item" style="width:100%; max-width:700px">
   <option value="">Choose an item&hellip; (type to search)</option>
-  {% for i in items %}<option value="{{ i.id }}"{% if i.photo %} data-thumb="{{ i.photo.url }}"{% endif %}{% if item and i.id == item.id %} selected{% endif %}>{{ i.name }}</option>{% endfor %}
+  {% for i in items %}<option value="{{ i.id }}"{% if i.photo %} data-thumb="{{ i.photo.url }}"{% endif %}{% if i.component_count %} data-combined="1"{% endif %}{% if item and i.id == item.id %} selected{% endif %}>{{ i.name }}</option>{% endfor %}
 </select>
 
 {% if item %}
@@ -85,7 +85,7 @@
         <input type="hidden" name="item" value="{{ item.id }}">
         <label for="components-select" class="mb-0" style="padding-top:6px">Made of:</label>
         <select name="components" id="components-select" multiple style="width:100%; max-width:500px">
-          {% for i in items %}{% if i.id != item.id %}
+          {% for i in items %}{% if i.id != item.id and not i.component_count or i in item.components.all %}
           <option value="{{ i.id }}"{% if i in item.components.all %} selected{% endif %}{% if i.photo %} data-thumb="{{ i.photo.url }}"{% endif %}>{{ i.name }}</option>
           {% endif %}{% endfor %}
         </select>
@@ -186,7 +186,7 @@
 
   // filter every item list by up to three search strings (an item must contain all of them); chosen/picked items stay
   var allItems = $("#pick-item option[value!='']").map(function () {
-    return { id: this.value, text: this.text, thumb: $(this).data("thumb") || "" };
+    return { id: this.value, text: this.text, thumb: $(this).data("thumb") || "", combined: !!$(this).data("combined") };
   }).get();
   var currentItemId = "{{ item.id|default:'' }}";  // the item being edited can't be its own component
 
@@ -200,7 +200,10 @@
   // rebuild a "made of" multi-select (keeps thumbnails and whatever's already picked)
   function rebuildComponentsSelect($select, terms, filtering, excludeId) {
     var picked = $select.val() || [];
-    var candidates = matching(terms, filtering, picked).filter(function (item) { return item.id !== excludeId; });
+    // combined items can't be components, so they're left out (unless already picked)
+    var candidates = matching(terms, filtering, picked).filter(function (item) {
+      return item.id !== excludeId && (!item.combined || picked.indexOf(item.id) !== -1);
+    });
     $select.empty();
     candidates.forEach(function (item) {
       var $o = $("<option>").val(item.id).text(item.text).prop("selected", picked.indexOf(item.id) !== -1);

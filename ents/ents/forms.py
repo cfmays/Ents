@@ -1,6 +1,6 @@
 from django.forms import Form
 from django import forms
-from .models import Enrichment, combined_items_notice
+from .models import Enrichment
 
 class test(forms.ModelForm):
     model = Enrichment
@@ -17,12 +17,10 @@ class CreateEnrichmentForm(forms.ModelForm):
         }
         widgets = {'comments': forms.Textarea(attrs={'rows': 2, 'cols': 60})}
 
-    def clean_components(self):
-        components = self.cleaned_data['components']
-        notice = combined_items_notice(components)
-        if notice:
-            raise forms.ValidationError(notice)
-        return components
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # a combined item can't be a component of another item
+        self.fields['components'].queryset = Enrichment.objects.filter(components__isnull=True)
         enctype="multipart/form-data"
 
 class EnrichmentSelect(forms.Select):

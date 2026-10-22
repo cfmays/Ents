@@ -182,8 +182,23 @@ class EnrichmentUploadViewTests(TestCase):
         combo = Enrichment.objects.create(name='Ball + Firehose')
         combo.components.add(ball)
         response = self.client.post(self.url, {'name': 'Bigger Combo', 'components': [combo.id]})
-        self.assertContains(response, 'Ball + Firehose is a combined item')
+        self.assertContains(response, 'Select a valid choice')
         self.assertFalse(Enrichment.objects.filter(name='Bigger Combo').exists())
+
+    def test_made_of_lists_leave_out_combined_items(self):
+        self.client.login(username='alice', password='password123')
+        ball = Enrichment.objects.create(name='Ball')
+        firehose = Enrichment.objects.create(name='Firehose')
+        combo = Enrichment.objects.create(name='Ball + Firehose')
+        combo.components.add(ball)
+        page = self.client.get(self.url, {'item': firehose.id})
+        made_of = page.content.decode().split('id="components-select"')[1].split('</select>')[0]
+        self.assertIn('>Ball</option>', made_of)
+        self.assertNotIn('Ball + Firehose', made_of)
+        new_item_choices = [str(label) for _, label in page.context['form'].fields['components'].choices]
+        self.assertIn('Ball', new_item_choices)
+        self.assertNotIn('Ball + Firehose', new_item_choices)
+        self.assertContains(page, f'value="{combo.id}" data-combined="1"')  # so the search filter leaves it out too
 
     def test_post_invalid_form_reshows_form_with_errors(self):
         self.client.login(username='alice', password='password123')
