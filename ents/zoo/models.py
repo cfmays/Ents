@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.db import models
 
-from ents.models import Enrichment
+from ents.models import Enrichment, join_comments
 
 SCALE_1_5 = [(i, str(i)) for i in range(1, 6)]
 
@@ -195,6 +195,16 @@ class ASGApprovedItem(models.Model):
 
     def __str__(self):
         return f"{self.item} → {self.asg}"
+
+    def component_comments(self):
+        """A combined item's components' comments on this same calendar (always their current text)."""
+        return join_comments(*ASGApprovedItem.objects.filter(
+            asg=self.asg_id, item__in=self.item.components.all(),
+        ).values_list('comments', flat=True))
+
+    def full_comments(self):
+        """Item comments first (its own, then its components'), then this calendar's comments."""
+        return join_comments(self.item.all_comments(), self.comments, self.component_comments())
 
 
 class CalendarEntry(models.Model):

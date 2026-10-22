@@ -1,6 +1,6 @@
 from django.forms import Form
 from django import forms
-from .models import Enrichment
+from .models import Enrichment, combined_items_notice
 
 class test(forms.ModelForm):
     model = Enrichment
@@ -10,8 +10,19 @@ class CreateEnrichmentForm(forms.ModelForm):
 
     class Meta:
         model = Enrichment
-        fields = ('name', 'photo', 'components')
-        labels = {'components': 'Made of (optional, for a combined item)'}
+        fields = ('name', 'photo', 'comments', 'components')
+        labels = {
+            'comments': 'Comments (optional, shown on every calendar)',
+            'components': 'Made of (optional, for a combined item)',
+        }
+        widgets = {'comments': forms.Textarea(attrs={'rows': 2, 'cols': 60})}
+
+    def clean_components(self):
+        components = self.cleaned_data['components']
+        notice = combined_items_notice(components)
+        if notice:
+            raise forms.ValidationError(notice)
+        return components
         enctype="multipart/form-data"
 
 class EnrichmentSelect(forms.Select):

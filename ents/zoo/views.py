@@ -17,7 +17,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
 from .forms import item_labels_for, AddAnimalChoiceForm, ItemAssignmentForm, TrainingSessionForm, TrainingStringForm, make_calendar_entry_formset
-from ents.models import Enrichment
+from ents.models import Enrichment, combined_items_notice
 from .models import Division, Behavior, Reinforcer, ASG, ASGApprovedItem, Animal, default_is_food, BehaviorGoal, BehaviorScore, CalendarEntry, Profile, SpecialConcern, String, TrainingAnimal, TrainingSession
 from django.utils.http import url_has_allowed_host_and_scheme
 
@@ -157,10 +157,13 @@ def _combine_entries(request, asg, year, month, ids):
     """Combine 2+ checked calendar entries (same date, same animal) into one entry using a
     new combined item made of the checked items; the other entries are removed."""
     entries = list(CalendarEntry.objects.filter(asg=asg, pk__in=ids).select_related('item'))
+    notice = combined_items_notice(e.item for e in entries)
     if len(entries) < 2:
         messages.warning(request, 'Check at least 2 items to combine.')
     elif len({e.date for e in entries}) > 1 or len({e.animal_id for e in entries}) > 1:
         messages.warning(request, 'Checked items must be for the same animal and the same day.')
+    elif notice:
+        messages.warning(request, f'Not combined. {notice}')
     else:
         entries.sort(key=lambda e: e.id)
         base, extras = entries[0], entries[1:]

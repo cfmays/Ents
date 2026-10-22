@@ -63,6 +63,15 @@
         <button type="submit" name="action" value="rename" class="btn btn-sm btn-secondary">Change name</button>
       </form>
 
+      <form method="post" style="display:flex; gap:8px; align-items:center">
+        {% csrf_token %}
+        <input type="hidden" name="item" value="{{ item.id }}">
+        <label for="item-comments" class="mb-0">Comments:</label>
+        <input type="text" id="item-comments" name="comments" value="{{ item.comments }}" maxlength="500" class="form-control" style="max-width:420px" placeholder="Shown on every calendar">
+        <button type="submit" name="action" value="comments" class="btn btn-sm btn-secondary">Save comments</button>
+      </form>
+      {% if item.component_comments %}<p class="text-muted small mb-1">Also shown, from its components: {{ item.component_comments }}</p>{% endif %}
+
       <form method="post" enctype="multipart/form-data" style="display:flex; gap:8px; align-items:center">
         {% csrf_token %}
         <input type="hidden" name="item" value="{{ item.id }}">

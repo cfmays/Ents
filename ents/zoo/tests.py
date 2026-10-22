@@ -304,6 +304,13 @@ class KeeperAccessScopingTests(TestCase):
         self.assertContains(response, 'Ball- 24” **Stays up at tiger | Frozen')
         self.assertContains(response, '>Feathers</option>')
 
+    def test_item_comment_comes_before_calendar_comment(self):
+        item = Enrichment.objects.create(name='Ball', photo=make_image_file(name='b.png'), comments='Rinse first')
+        ASGApprovedItem.objects.create(asg=self.asg, item=item, comments='Stays up at tiger')
+        self.client.force_login(self.assigned_keeper)
+        response = self.client.get(reverse('zoo:calendar_tab', args=[self.asg.id]))
+        self.assertContains(response, 'Ball **Rinse first | Stays up at tiger')
+
     def test_calendar_row_with_note_but_no_date_shows_message(self):
         item = Enrichment.objects.create(name='Ball', photo=make_image_file(name='ball.png'))
         ASGApprovedItem.objects.create(asg=self.asg, item=item)
@@ -378,6 +385,48 @@ class KeeperAccessScopingTests(TestCase):
         self.assertEqual(merged.item.name, 'Ball + Firehose')
         self.assertEqual(set(merged.item.components.all()), {ball, firehose})
         self.assertTrue(ASGApprovedItem.objects.filter(asg=self.asg, item=merged.item).exists())
+
+    def test_combined_item_shows_its_components_current_comments(self):
+        ball = Enrichment.objects.create(name='Ball', comments='Rinse first')
+        firehose = Enrichment.objects.create(name='Firehose', comments='Check seams')
+        ASGApprovedItem.objects.create(asg=self.asg, item=ball, comments='Float it')
+        ASGApprovedItem.objects.create(asg=self.asg, item=firehose)
+        first = CalendarEntry.objects.create(asg=self.asg, date='2026-09-03', item=ball)
+        second = CalendarEntry.objects.create(asg=self.asg, date='2026-09-03', item=firehose)
+        self.client.force_login(self.assigned_keeper)
+        self.client.post(reverse('zoo:calendar_tab', args=[self.asg.id]), {
+            'form-TOTAL_FORMS': '2', 'form-INITIAL_FORMS': '2', 'form-MIN_NUM_FORMS': '0', 'form-MAX_NUM_FORMS': '1000',
+            'form-0-id': str(first.id), 'form-0-date': '2026-09-03', 'form-0-item': str(ball.id),
+            'form-1-id': str(second.id), 'form-1-date': '2026-09-03', 'form-1-item': str(firehose.id),
+            'action': 'combine', 'combine': ['0', '1'],
+        })
+        combo = Enrichment.objects.get(name='Ball + Firehose')
+        assignment = ASGApprovedItem.objects.get(asg=self.asg, item=combo)
+        self.assertEqual(combo.comments, '')  # nothing is copied
+        self.assertEqual(assignment.full_comments(), 'Rinse first | Check seams | Float it')
+
+        # later changes to a component show up on the combined item
+        ball.comments = 'Rinse twice'
+        ball.save()
+        self.assertEqual(assignment.full_comments(), 'Rinse twice | Check seams | Float it')
+
+    def test_combine_refuses_an_item_that_is_already_combined(self):
+        ball = Enrichment.objects.create(name='Ball')
+        combo = Enrichment.objects.create(name='Ball + Firehose')
+        combo.components.add(ball)
+        first = CalendarEntry.objects.create(asg=self.asg, date='2026-09-03', item=ball)
+        second = CalendarEntry.objects.create(asg=self.asg, date='2026-09-03', item=combo)
+        ASGApprovedItem.objects.create(asg=self.asg, item=ball)
+        ASGApprovedItem.objects.create(asg=self.asg, item=combo)
+        self.client.force_login(self.assigned_keeper)
+        response = self.client.post(reverse('zoo:calendar_tab', args=[self.asg.id]), {
+            'form-TOTAL_FORMS': '2', 'form-INITIAL_FORMS': '2', 'form-MIN_NUM_FORMS': '0', 'form-MAX_NUM_FORMS': '1000',
+            'form-0-id': str(first.id), 'form-0-date': '2026-09-03', 'form-0-item': str(ball.id),
+            'form-1-id': str(second.id), 'form-1-date': '2026-09-03', 'form-1-item': str(combo.id),
+            'action': 'combine', 'combine': ['0', '1'],
+        }, follow=True)
+        self.assertContains(response, 'Not combined. Ball + Firehose is a combined item')
+        self.assertEqual(CalendarEntry.objects.count(), 2)
 
     def test_combine_refuses_entries_for_different_dates_or_animals(self):
         ball = Enrichment.objects.create(name='Ball', photo=make_image_file(name='b.png'))

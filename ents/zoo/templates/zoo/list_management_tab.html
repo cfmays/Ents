@@ -125,13 +125,15 @@
     {% for assignment in assignments %}
     <div class="item-row">
       {% if assignment.item.photo %}
-      <img class="row-photo" src="{{ assignment.item.photo.url }}" data-caption="{{ assignment.item.name }}{% if assignment.comments %} **{{ assignment.comments }}{% endif %}" title="Click to see the photo full size" style="height:50px;width:50px;flex-shrink:0;object-fit:cover;border-radius:4px;">
+      <img class="row-photo" src="{{ assignment.item.photo.url }}" data-caption="{{ assignment.item.name }}{% if assignment.full_comments %} **{{ assignment.full_comments }}{% endif %}" title="Click to see the photo full size" style="height:50px;width:50px;flex-shrink:0;object-fit:cover;border-radius:4px;">
       {% else %}
       <div style="height:50px;width:50px;flex-shrink:0;background:#ddd;border-radius:4px;"></div>
       {% endif %}
       <div class="item-text">
         {{ assignment.item.name }}
         {% if assignment.rate %}<div class="text-muted small">Rate: {{ assignment.rate }}</div>{% endif %}
+        {% if assignment.item.all_comments %}<div class="text-muted small">Item comments (all calendars): {{ assignment.item.all_comments }}</div>{% endif %}
+        {% if assignment.component_comments %}<div class="text-muted small">From its components on this calendar: {{ assignment.component_comments }}</div>{% endif %}
         <form method="post" style="display:flex;gap:6px;align-items:center;margin-top:4px">
           {% csrf_token %}
           <input type="text" name="comments" value="{{ assignment.comments }}" maxlength="500" class="form-control form-control-sm" placeholder="Comments" style="max-width:320px">

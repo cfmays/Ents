@@ -7,21 +7,21 @@ from django.forms import modelformset_factory
 from ents.forms import EnrichmentSelect
 from ents.models import Enrichment
 
-from .models import ASG, Animal, CalendarEntry, Reinforcer, SCALE_1_5, String
+from .models import ASG, Animal, CalendarEntry, Reinforcer, SCALE_1_5, String, join_comments
 from .permissions import is_supervisor
 
 
 def item_labels_for(asg):
-    """{item id: "Item name **comment"}, like the sheet's combined list, so keepers see the notes when choosing."""
+    """{item id: "Item name **comment"}, like the sheet's combined list, so keepers see the notes when choosing.
+    The item's own comment comes first, then this calendar's comment(s)."""
     comments = {}
     for assignment in asg.item_assignments.select_related('item'):
-        label_comments = comments.setdefault(assignment.item_id, (assignment.item.name, []))[1]
-        if assignment.comments and assignment.comments not in label_comments:
-            label_comments.append(assignment.comments)
-    return {
-        item_id: f"{name} **{' | '.join(notes)}" if notes else name
-        for item_id, (name, notes) in comments.items()
-    }
+        comments.setdefault(assignment.item_id, [assignment.item.name]).append(assignment.full_comments())
+    labels = {}
+    for item_id, (name, *notes) in comments.items():
+        note = join_comments(*notes)
+        labels[item_id] = f"{name} **{note}" if note else name
+    return labels
 
 
 def make_calendar_entry_form(asg, year, month):

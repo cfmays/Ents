@@ -9,7 +9,7 @@ from django.core.files.storage import default_storage
 from django.http import FileResponse, Http404
 from django.http.response import JsonResponse
 from django.shortcuts import render
-from .models import Enrichment
+from .models import Enrichment, combined_items_notice
 from django.contrib.auth import logout
 from django.http import HttpResponseRedirect
 from django.urls import reverse
@@ -116,6 +116,10 @@ def _manage_item(request, item, action):
             item.name = name
             item.save()
             messages.success(request, 'Item renamed.')
+    elif action == 'comments':
+        item.comments = request.POST.get('comments', '').strip()[:500]
+        item.save()
+        messages.success(request, 'Comments saved.')
     elif action == 'photo':
         form = ItemPhotoForm(request.POST, request.FILES)
         if form.is_valid():
@@ -128,10 +132,19 @@ def _manage_item(request, item, action):
             messages.warning(request, 'Choose an image file (jpg, png, gif or webp).')
     elif action == 'components':
         chosen = Enrichment.objects.exclude(pk=item.pk).filter(pk__in=request.POST.getlist('components'))
-        item.components.set(chosen)
-        if chosen:
+        used_in = item.used_in.all()
+        notice = combined_items_notice(chosen)
+        if notice:
+            messages.warning(request, f'Components not saved. {notice}')
+        elif chosen and used_in:
+            names = ', '.join(i.name for i in used_in)
+            messages.warning(request, f'Components not saved. {item.name} is a component of {names}, '
+                                      'so it cannot become a combined item itself.')
+        elif chosen:
+            item.components.set(chosen)
             messages.success(request, f'{item.name} is now a combined item made of {chosen.count()} item(s).')
         else:
+            item.components.clear()
             messages.success(request, f'{item.name} is now a normal single item.')
     elif action == 'delete':
         entries = item.calendar_entries.count()
@@ -153,7 +166,7 @@ def EnrichmentUploadView(request):
     item = Enrichment.objects.filter(pk=request.GET.get('item') or request.POST.get('item') or None).first()
     action = request.POST.get('action')
     assign_form = ItemAssignmentForm(divisions=division_scope(request))
-    if request.method == 'POST' and action in ('rename', 'photo', 'components', 'delete'):
+    if request.method == 'POST' and action in ('rename', 'comments', 'photo', 'components', 'delete'):
         return _manage_item(request, item, action)
     if request.method == 'POST' and action == 'add_from_unassigned':
         return _add_from_unassigned(request)

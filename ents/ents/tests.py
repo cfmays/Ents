@@ -167,6 +167,24 @@ class EnrichmentUploadViewTests(TestCase):
         new_item = Enrichment.objects.get(name='Ball in a Firehose')
         self.assertEqual(set(new_item.components.all()), {ball, firehose})
 
+    def test_post_with_comments_and_components_links_their_comments(self):
+        self.client.login(username='alice', password='password123')
+        ball = Enrichment.objects.create(name='Ball', comments='Rinse first')
+        firehose = Enrichment.objects.create(name='Firehose')
+        self.client.post(self.url, {'name': 'Ball in a Firehose', 'comments': 'Supervised only', 'components': [ball.id, firehose.id]})
+        new_item = Enrichment.objects.get(name='Ball in a Firehose')
+        self.assertEqual(new_item.comments, 'Supervised only')
+        self.assertEqual(new_item.all_comments(), 'Supervised only | Rinse first')
+
+    def test_post_refuses_a_combined_item_as_a_component(self):
+        self.client.login(username='alice', password='password123')
+        ball = Enrichment.objects.create(name='Ball')
+        combo = Enrichment.objects.create(name='Ball + Firehose')
+        combo.components.add(ball)
+        response = self.client.post(self.url, {'name': 'Bigger Combo', 'components': [combo.id]})
+        self.assertContains(response, 'Ball + Firehose is a combined item')
+        self.assertFalse(Enrichment.objects.filter(name='Bigger Combo').exists())
+
     def test_post_invalid_form_reshows_form_with_errors(self):
         self.client.login(username='alice', password='password123')
         response = self.client.post(self.url, {'name': '', 'photo': ''})
@@ -255,6 +273,36 @@ class ManageItemsTests(TestCase):
         response = self.client.post(self.url, {'action': 'components', 'item': self.item.id}, follow=True)
         self.assertFalse(self.item.components.exists())
         self.assertContains(response, 'normal single item')
+
+    def test_edit_item_comments(self):
+        self.client.post(self.url, {'action': 'comments', 'item': self.item.id, 'comments': ' Rinse first '})
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.comments, 'Rinse first')
+
+    def test_set_components_links_item_and_calendar_comments(self):
+        from zoo.models import ASG, ASGApprovedItem, String
+        asg = ASG.objects.create(name='Tiger', string=String.objects.create(name='S'))
+        ball = Enrichment.objects.create(name='Ball', comments='Rinse first')
+        ASGApprovedItem.objects.create(asg=asg, item=ball, comments='Float it')
+        combo = ASGApprovedItem.objects.create(asg=asg, item=self.item)
+        self.client.post(self.url, {'action': 'components', 'item': self.item.id, 'components': [ball.id]})
+        combo.refresh_from_db()
+        self.assertEqual(combo.comments, '')  # nothing is copied
+        self.assertEqual(combo.full_comments(), 'Rinse first | Float it')
+        self.assertContains(self.client.get(self.url, {'item': self.item.id}), 'Also shown, from its components: Rinse first')
+
+    def test_set_components_refuses_combined_items(self):
+        ball = Enrichment.objects.create(name='Ball')
+        combo = Enrichment.objects.create(name='Ball + Firehose')
+        combo.components.add(ball)
+        response = self.client.post(self.url, {'action': 'components', 'item': self.item.id, 'components': [combo.id]}, follow=True)
+        self.assertContains(response, 'Components not saved. Ball + Firehose is a combined item')
+        self.assertFalse(self.item.components.exists())
+
+        # an item that is already a component can't become a combined item either
+        response = self.client.post(self.url, {'action': 'components', 'item': ball.id, 'components': [self.item.id]}, follow=True)
+        self.assertContains(response, 'Ball is a component of Ball + Firehose')
+        self.assertFalse(ball.components.exists())
 
     def test_components_cannot_include_the_item_itself(self):
         self.client.post(self.url, {'action': 'components', 'item': self.item.id, 'components': [self.item.id]})
