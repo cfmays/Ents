@@ -74,7 +74,7 @@ class TrainingFlowTests(TestCase):
         self.client.post(reverse('zoo:training_entry', args=[self.animal.id]), {'date': '2026-09-15'})  # not logged in: ignored
         self.client.force_login(self.keeper)
         self.client.post(reverse('zoo:training_entry', args=[self.animal.id]), {
-            'date': '2026-09-15', 'reinforcer_1': self.reinforcer.id, 'comments': 'Good session',
+            'date': '2026-09-15', 'time_of_day': 'AM', 'reinforcer_1': self.reinforcer.id, 'comments': 'Good session',
             f'behavior_{self.maintenance_behavior.id}': '4',
         })
         page = self.client.get(reverse('zoo:training_history', args=[self.animal.id]))
@@ -100,7 +100,7 @@ class TrainingFlowTests(TestCase):
         self.assertContains(page, '>Graph<')
         self.assertContains(page, '>Print<')
         self.assertContains(page, '"name": "Target"')
-        self.assertContains(page, '"labels": ["2026-09-01", "2026-09-08"]')
+        self.assertContains(page, '"labels": ["2026-09-01 AM", "2026-09-08 AM"]')
         self.assertContains(page, '"data": [3, 5]')
 
     def test_training_history_comments_get_their_own_print_row(self):
@@ -137,6 +137,7 @@ class TrainingFlowTests(TestCase):
         self.client.force_login(self.keeper)
         response = self.client.post(reverse('zoo:training_entry', args=[self.animal.id]), {
             'date': '2026-09-15',
+            'time_of_day': 'PM',
             'reinforcer_1': self.reinforcer.id,
             f'behavior_{self.maintenance_behavior.id}': '4',
             f'behavior_{self.new_behavior.id}': '3',
@@ -144,6 +145,7 @@ class TrainingFlowTests(TestCase):
         self.assertEqual(response.status_code, 302)
         session = self.animal.training_sessions.get()
         self.assertEqual(session.trainer, self.keeper)
+        self.assertEqual(session.time_of_day, 'PM')
         self.assertEqual(session.reinforcer_1, self.reinforcer)
         self.assertIsNone(session.reinforcer_2)
         scores = {score.behavior_id: score.score for score in session.behavior_scores.all()}
@@ -153,6 +155,32 @@ class TrainingFlowTests(TestCase):
         self.keeper.profile.refresh_from_db()
         self.assertEqual(self.keeper.profile.last_training_string, self.string)
 
+    def test_training_entry_defaults_to_am_and_requires_am_or_pm(self):
+        self.client.force_login(self.keeper)
+        url = reverse('zoo:training_entry', args=[self.animal.id])
+        page = self.client.get(url)
+        self.assertContains(page, 'value="AM" id="id_time_of_day_0" required checked')  # AM is preselected
+        self.assertContains(page, 'value="PM" id="id_time_of_day_1" required>')
+
+        response = self.client.post(url, {'date': '2026-09-15'})
+        self.assertEqual(response.status_code, 200)  # form shown again with an error
+        self.assertFalse(self.animal.training_sessions.exists())
+
+    def test_training_history_shows_am_pm_with_pm_first_on_the_same_day(self):
+        am = TrainingSession.objects.create(animal=self.animal, date='2026-09-01', time_of_day='AM')
+        pm = TrainingSession.objects.create(animal=self.animal, date='2026-09-01', time_of_day='PM')
+        am_later = TrainingSession.objects.create(animal=self.animal, date='2026-09-01', time_of_day='AM')
+        BehaviorScore.objects.create(session=pm, behavior=self.maintenance_behavior, score=5)
+        BehaviorScore.objects.create(session=am, behavior=self.maintenance_behavior, score=2)
+
+        self.client.force_login(self.keeper)
+        page = self.client.get(reverse('zoo:training_history', args=[self.animal.id]))
+        self.assertEqual(list(page.context['page_obj']), [pm, am_later, am])
+        self.assertContains(page, 'Sept. 1, 2026 PM')
+        behavior = page.context['chart_data']['behaviors'][0]
+        self.assertEqual(behavior['labels'], ['2026-09-01 AM', '2026-09-01 PM'])
+        self.assertEqual(behavior['data'], [2, 5])
+
     def test_submit_and_next_animal_goes_to_the_next_animal_in_the_string(self):
         next_animal = TrainingAnimal.objects.create(name='Zar', string=self.string)  # sorts after "Mee-Noi"
         self.client.force_login(self.keeper)
@@ -160,7 +188,7 @@ class TrainingFlowTests(TestCase):
         self.assertContains(self.client.get(url), 'Submit &amp; next animal (Zar)')
 
         response = self.client.post(url, {
-            'date': '2026-09-15', 'reinforcer_1': self.reinforcer.id,
+            'date': '2026-09-15', 'time_of_day': 'AM', 'reinforcer_1': self.reinforcer.id,
             f'behavior_{self.maintenance_behavior.id}': '4', 'go_to_next': '1',
         })
         self.assertRedirects(response, reverse('zoo:training_entry', args=[next_animal.id]))
@@ -172,7 +200,7 @@ class TrainingFlowTests(TestCase):
         self.assertNotContains(self.client.get(url), 'next animal')
 
         response = self.client.post(url, {
-            'date': '2026-09-15', 'reinforcer_1': self.reinforcer.id,
+            'date': '2026-09-15', 'time_of_day': 'AM', 'reinforcer_1': self.reinforcer.id,
             f'behavior_{self.maintenance_behavior.id}': '4', 'go_to_next': '1',
         }, follow=True)
         self.assertRedirects(response, reverse('zoo:training_start'))

@@ -60,7 +60,7 @@
     <tbody>
       {% for session in page_obj %}
       <tr{% if session.comments %} class="has-comment-row"{% endif %}>
-        <td>{{ session.date }}</td>
+        <td>{{ session.date }} {{ session.time_of_day }}</td>
         <td>{{ session.trainer.username|capfirst|default:"" }}</td>
         <td>{{ session.session_length_minutes|default_if_none:"" }}</td>
         <td>{{ session.overall_rating|default_if_none:"" }}</td>

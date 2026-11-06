@@ -7,7 +7,7 @@ from django.forms import modelformset_factory
 from ents.forms import EnrichmentSelect
 from ents.models import Enrichment
 
-from .models import ASG, Animal, CalendarEntry, Reinforcer, SCALE_1_5, String, join_comments
+from .models import ASG, Animal, CalendarEntry, Reinforcer, SCALE_1_5, String, TIME_OF_DAY_CHOICES, join_comments
 from .permissions import is_supervisor
 
 
@@ -104,6 +104,7 @@ class TrainingStringForm(forms.Form):
 
 class TrainingSessionForm(forms.Form):
     date = forms.DateField(widget=forms.DateInput(attrs={'type': 'date'}))
+    time_of_day = forms.ChoiceField(choices=TIME_OF_DAY_CHOICES, initial='AM', widget=forms.RadioSelect)
     session_length_minutes = forms.IntegerField(required=False, min_value=1, label='Session length (minutes)')
     overall_rating = forms.TypedChoiceField(choices=[('', '—')] + SCALE_1_5, coerce=int, required=False,
                                              label='Overall session rating (1 = Refused, 5 = Perfect)')

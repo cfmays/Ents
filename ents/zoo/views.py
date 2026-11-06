@@ -438,10 +438,11 @@ def training_ajax_animals_for_string(request):
 def _behavior_chart_data(animal):
     """Each behavior's score over time, for the History page's graph: one small chart per
     behavior (a combined chart reads as chaos once several behaviors' lines cross)."""
-    scores = BehaviorScore.objects.filter(session__animal=animal).select_related('behavior', 'session').order_by('session__date')
+    scores = BehaviorScore.objects.filter(session__animal=animal).select_related('behavior', 'session').order_by('session__date', 'session__time_of_day', 'session__id')
     by_behavior = defaultdict(list)
     for score in scores:
-        by_behavior[score.behavior.name].append((score.session.date.isoformat(), score.score))
+        label = f'{score.session.date.isoformat()} {score.session.time_of_day}'
+        by_behavior[score.behavior.name].append((label, score.score))
 
     return {
         'behaviors': [
@@ -476,6 +477,7 @@ def training_entry(request, animal_id):
                 animal=animal,
                 trainer=request.user,
                 date=form.cleaned_data['date'],
+                time_of_day=form.cleaned_data['time_of_day'],
                 session_length_minutes=form.cleaned_data['session_length_minutes'],
                 overall_rating=form.cleaned_data['overall_rating'] or None,
                 aggression_level=form.cleaned_data['aggression_level'] or None,

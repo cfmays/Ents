@@ -27,6 +27,11 @@ GBS_CHOICES = [
     ('U', 'U - Unable to evaluate'),
 ]
 
+TIME_OF_DAY_CHOICES = [
+    ('AM', 'AM'),
+    ('PM', 'PM'),
+]
+
 BEHAVIOR_TYPE_CHOICES = [
     ('maintenance', 'Maintenance Behavior'),
     ('new', 'New Behavior'),
@@ -237,6 +242,7 @@ class TrainingSession(models.Model):
     animal = models.ForeignKey(TrainingAnimal, on_delete=models.CASCADE, related_name='training_sessions')
     trainer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='training_sessions')
     date = models.DateField()
+    time_of_day = models.CharField(max_length=2, choices=TIME_OF_DAY_CHOICES, default='AM')
     session_length_minutes = models.PositiveSmallIntegerField(null=True, blank=True)
     overall_rating = models.IntegerField(choices=SCALE_1_5, null=True, blank=True)
     aggression_level = models.IntegerField(choices=SCALE_1_5, null=True, blank=True)
@@ -250,7 +256,7 @@ class TrainingSession(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['-date', '-id']
+        ordering = ['-date', '-time_of_day', '-id']
 
     def __str__(self):
         return f"{self.animal} {self.date} ({self.trainer})"

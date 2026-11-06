@@ -161,7 +161,7 @@ class BehaviorScoreInline(admin.TabularInline):
 class TrainingSessionAdmin(DivisionScopedAdminMixin, admin.ModelAdmin):
     division_lookup = 'animal__string__division'
     division_scoped_fk_fields = {'animal': 'string__division'}
-    list_display = ['animal', 'date', 'trainer', 'overall_rating']
+    list_display = ['animal', 'date', 'time_of_day', 'trainer', 'overall_rating']
     list_filter = ['animal', 'date']
     date_hierarchy = 'date'
     inlines = [BehaviorScoreInline]
