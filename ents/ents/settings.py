@@ -126,6 +126,9 @@ DATABASES = {
     }
 }
 
+# A busy month's calendar has ~10 fields per entry; Django's default of 1000 is too low
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 20000
+
 
 AUTHENTICATION_BACKENDS = ['ents.auth_backends.CaseInsensitiveModelBackend']
 
